@@ -1,7 +1,0 @@
-INFO:     Will watch for changes in these directories: ['C:\\Users\\iet03\\Documents\\Hub\\agents\\schedule\\src']
-INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
-INFO:     Started reloader process [21120] using StatReload
-INFO:     Started server process [26340]
-INFO:     Waiting for application startup.
-apscheduler not installed \u2014 background tasks disabled
-INFO:     Application startup complete.
