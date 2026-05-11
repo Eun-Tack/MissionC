@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+{% block title %}WBS · MC{% endblock %}
+
+{% block head %}
+<style>
+  .page { display: grid; grid-template-rows: 56px 1fr; height: 100vh; }
+  .content { padding: 24px 32px; max-width: 1400px; margin: 0 auto; width: 100%;
+             overflow-y: auto; }
+  .page-h-row { display: flex; align-items: baseline; gap: 14px; margin-bottom: 4px; }
+  .page-h     { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
+  .page-meta  { font-size: 12px; color: var(--muted); }
+  .page-sub   { font-size: 12px; color: var(--muted); margin-bottom: 18px; }
+
+  /* Selector controls */
+  .wbs-selectors {
+    display: flex; gap: 10px; margin-bottom: 24px; align-items: center;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px 14px;
+  }
+  .wbs-selectors label {
+    font-size: 11px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.06em; font-weight: 600;
+  }
+  .wbs-selectors select {
+    padding: 6px 12px; border: 1px solid var(--border); border-radius: 7px;
+    background: var(--bg); color: var(--fg); font-size: 13px; font-family: inherit;
+    min-width: 200px; cursor: pointer;
+  }
+  .wbs-selectors select:focus { outline: none; border-color: var(--brand); }
+
+  /* Gantt frame */
+  .gantt {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; overflow: hidden;
+    display: grid; grid-template-columns: 280px 1fr;
+  }
+
+  /* Left column (item names) */
+  .gantt-names { border-right: 1px solid var(--border); }
+  .gantt-name-h {
+    padding: 10px 14px; font-size: 11px; font-weight: 600; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.06em;
+    background: var(--surface-2); border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 2;
+  }
+  .gantt-name {
+    padding: 8px 14px; font-size: 13px; line-height: 1.3;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px;
+    height: 36px; box-sizing: border-box;
+  }
+  .gantt-name.depth-2 { padding-left: 30px; font-size: 12px; color: var(--muted); }
+  .gantt-name .dot {
+    width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+  }
+  .gantt-name .dot.todo        { background: none; border: 1.5px solid var(--muted); }
+  .gantt-name .dot.in_progress,
+  .gantt-name .dot.doing,
+  .gantt-name .dot.active      { background: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
+  .gantt-name .dot.done        { background: var(--st-done); }
+  .gantt-name .dot.waiting,
+  .gantt-name .dot.review      { background: var(--st-waiting); }
+  .gantt-name .dot.planning    { background: var(--accent); }
+  .gantt-name .dot.paused      { background: var(--muted); }
+  .gantt-name .label-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gantt-name .pct {
+    font-size: 10px; font-family: 'JetBrains Mono', monospace;
+    color: var(--brand); font-weight: 600; flex-shrink: 0;
+  }
+
+  /* Right column (timeline + bars) */
+  .gantt-timeline {
+    position: relative; overflow-x: auto; overflow-y: hidden;
+    min-height: 100%;
+  }
+  .gantt-axis {
+    height: 36px; position: sticky; top: 0; z-index: 2;
+    background: var(--surface-2); border-bottom: 1px solid var(--border);
+  }
+  .gantt-month-tick {
+    position: absolute; top: 0; bottom: 0; width: 1px; background: var(--border);
+  }
+  .gantt-month-label {
+    position: absolute; top: 9px; transform: translateX(4px);
+    font-size: 10px; font-family: 'JetBrains Mono', monospace;
+    color: var(--muted); font-weight: 600;
+  }
+
+  /* Today line */
+  .gantt-today-line {
+    position: absolute; top: 36px; bottom: 0;
+    width: 2px; background: oklch(60% 0.21 25); opacity: 0.7; z-index: 1;
+    pointer-events: none;
+  }
+  .gantt-today-label {
+    position: absolute; top: 14px; transform: translateX(-50%);
+    font-size: 10px; color: oklch(50% 0.21 25); font-weight: 700;
+    background: var(--surface-2); padding: 1px 6px; border-radius: 4px;
+    z-index: 2;
+  }
+
+  /* Bar rows */
+  .gantt-row {
+    height: 36px; box-sizing: border-box;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+  }
+  .gantt-bar {
+    position: absolute; top: 8px; height: 20px;
+    border-radius: 6px; display: flex; align-items: center;
+    padding: 0 8px; font-size: 11px; font-weight: 500;
+    overflow: hidden; white-space: nowrap;
+    cursor: pointer; transition: filter 120ms;
+  }
+  .gantt-bar:hover { filter: brightness(1.05); }
+  .gantt-bar.kind-project { background: var(--brand); color: white; }
+  .gantt-bar.kind-task    { background: var(--brand-soft); color: var(--brand); border: 1px solid var(--brand); }
+  .gantt-bar.kind-subtask { background: oklch(95% 0.05 200); color: oklch(40% 0.16 200); border: 1px dashed oklch(70% 0.12 200); height: 16px; top: 10px; }
+  .gantt-bar.is-done { background: oklch(94% 0.06 145); color: oklch(35% 0.16 145); border: 1px solid oklch(75% 0.12 145); text-decoration: line-through; }
+  .gantt-bar.is-overdue { background: oklch(60% 0.21 25); color: white; border: none; }
+
+  /* Progress overlay on project bars */
+  .gantt-bar-fill {
+    position: absolute; left: 0; top: 0; bottom: 0;
+    background: oklch(0% 0 0 / 0.18); border-radius: 6px 0 0 6px;
+    pointer-events: none;
+  }
+
+  /* No-date bar (just a dot at today) */
+  .gantt-bar-undated {
+    position: absolute; top: 13px; width: 10px; height: 10px;
+    border-radius: 50%; background: var(--muted); opacity: 0.5;
+  }
+
+  /* Empty state */
+  .wbs-empty { text-align: center; padding: 80px 20px; color: var(--muted); }
+  .wbs-empty-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
+  .wbs-empty-title { font-size: 16px; font-weight: 600; color: var(--fg); margin-bottom: 8px; }
+
+  /* Legend */
+  .wbs-legend {
+    display: flex; gap: 16px; margin-top: 12px;
+    font-size: 11px; color: var(--muted); flex-wrap: wrap;
+  }
+  .wbs-legend-item { display: flex; align-items: center; gap: 6px; }
+  .wbs-legend-swatch { width: 18px; height: 8px; border-radius: 3px; }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="page">
+  {% set active_nav = 'wbs' %}
+  {% include "partials/topbar.html" %}
+
+  <div class="content">
+    <div class="page-h-row">
+      <div class="page-h">WBS · 작업 분해</div>
+      {% if header %}
+      <span class="page-meta">{{ header.org_name or '' }}{% if header.biz_name %} / {{ header.biz_name }}{% endif %} · {{ header.title }}</span>
+      {% endif %}
+    </div>
+    <div class="page-sub">사업 또는 프로젝트의 일정을 Gantt 뷰로 확인합니다.</div>
+
+    <!-- ── Selector ─────────────────────────────────────────── -->
+    <div class="wbs-selectors">
+      <label>사업</label>
+      <select onchange="if(this.value) location.href='/wbs?biz_id='+this.value">
+        <option value="">— 사업 선택 —</option>
+        {% for b in selectors.businesses %}
+        <option value="{{ b.id }}" {% if biz_id == b.id %}selected{% endif %}>
+          {% if b.org_name %}{{ b.org_name }} · {% endif %}{{ b.name }}
+        </option>
+        {% endfor %}
+      </select>
+
+      <label>프로젝트</label>
+      <select onchange="if(this.value) location.href='/wbs?proj_id='+this.value">
+        <option value="">— 프로젝트 선택 —</option>
+        {% for p in selectors.projects %}
+        <option value="{{ p.id }}" {% if proj_id == p.id %}selected{% endif %}>
+          {% if p.org_name %}{{ p.org_name }} / {% endif %}{% if p.biz_name %}{{ p.biz_name }} / {% endif %}{{ p.title }}
+        </option>
+        {% endfor %}
+      </select>
+
+      {% if scope != 'none' %}
+      <span style="margin-left:auto; font-size:11px; color:var(--muted); font-family:'JetBrains Mono',monospace;">
+        {{ range_start }} → {{ range_end }}
+      </span>
+      {% endif %}
+    </div>
+
+    <!-- ── Gantt body ───────────────────────────────────────── -->
+    {% if rows %}
+    <div class="gantt">
+      <!-- Names column -->
+      <div class="gantt-names">
+        <div class="gantt-name-h">항목</div>
+        {% for r in rows %}
+        <div class="gantt-name depth-{{ r.depth }}">
+          <span class="dot {{ r.status or 'todo' }}"></span>
+          <span class="label-text" title="{{ r.title }}">{{ r.title }}</span>
+          {% if r.pct is defined %}<span class="pct">{{ r.pct }}%</span>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Timeline column -->
+      <div class="gantt-timeline">
+        <div class="gantt-axis">
+          {% for m in markers %}
+          <div class="gantt-month-tick" style="left: {{ m.left }}%"></div>
+          <div class="gantt-month-label" style="left: {{ m.left }}%">{{ m.label }}</div>
+          {% endfor %}
+        </div>
+
+        {% if today_offset is not none %}
+        <div class="gantt-today-line" style="left: {{ today_offset }}%"></div>
+        <div class="gantt-today-label" style="left: {{ today_offset }}%">오늘</div>
+        {% endif %}
+
+        {% for r in rows %}
+        <div class="gantt-row">
+          {% if r.has_dates %}
+          {% set is_overdue = r.bar_end and r.bar_end < today and r.status not in ('done', 'archived') %}
+          <div class="gantt-bar kind-{{ r.kind }}{% if r.status == 'done' %} is-done{% elif is_overdue %} is-overdue{% endif %}"
+               style="left: {{ r.bar_left }}%; width: {{ r.bar_width }}%;"
+               title="{{ r.title }} · {{ r.bar_start or '?' }} → {{ r.bar_end or '?' }}"
+               {% if r.kind == 'project' %}onclick="location.href='/project/{{ r.id }}'"{% endif %}>
+            {% if r.kind == 'project' and r.pct is defined and r.pct > 0 %}
+            <div class="gantt-bar-fill" style="width: {{ r.pct }}%;"></div>
+            {% endif %}
+            <span style="position:relative; z-index:1;">{{ r.title[:24] }}{% if r.title|length > 24 %}…{% endif %}</span>
+          </div>
+          {% else %}
+          <div class="gantt-bar-undated"
+               style="left: {{ today_offset or 50 }}%;"
+               title="{{ r.title }} · 일정 미설정"></div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="wbs-legend">
+      <span class="wbs-legend-item"><span class="wbs-legend-swatch" style="background:var(--brand);"></span> 프로젝트</span>
+      <span class="wbs-legend-item"><span class="wbs-legend-swatch" style="background:var(--brand-soft); border:1px solid var(--brand);"></span> 작업</span>
+      <span class="wbs-legend-item"><span class="wbs-legend-swatch" style="background:oklch(95% 0.05 200); border:1px dashed oklch(70% 0.12 200);"></span> 하위</span>
+      <span class="wbs-legend-item"><span class="wbs-legend-swatch" style="background:oklch(94% 0.06 145);"></span> 완료</span>
+      <span class="wbs-legend-item"><span class="wbs-legend-swatch" style="background:oklch(60% 0.21 25);"></span> 지연</span>
+    </div>
+
+    {% else %}
+    <div class="wbs-empty">
+      <div class="wbs-empty-icon">📊</div>
+      <div class="wbs-empty-title">사업 또는 프로젝트를 선택하세요</div>
+      <div>위 셀렉터에서 항목을 선택하면 Gantt 형태로 일정이 표시됩니다.</div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

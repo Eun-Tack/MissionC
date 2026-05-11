@@ -1,0 +1,738 @@
+{% extends "base.html" %}
+{% block title %}Today's Flow · MC{% endblock %}
+
+{% block head %}
+<style>
+  /* SC-01 Layout */
+  .app { display: grid;
+         grid-template-rows: 56px 1fr 56px;
+         grid-template-columns: 220px 1fr 380px;
+         height: 100vh;
+         grid-template-areas:
+           "topbar topbar topbar"
+           "sidebar main panel"
+           "capture capture capture"; }
+
+  .topbar  { grid-area: topbar;   border-bottom: 1px solid var(--border);
+             display: flex; align-items: center; padding: 0 20px; gap: 16px;
+             background: var(--bg); position: sticky; top: 0; z-index: 10; }
+  .sidebar { grid-area: sidebar;  border-right: 1px solid var(--border);
+             padding: 20px 12px; overflow-y: auto; background: var(--surface);
+             position: relative; }
+  .main    { grid-area: main;     overflow-y: auto; padding: 20px 32px; }
+  .panel   { grid-area: panel;    border-left: 1px solid var(--border);
+             background: var(--surface); overflow-y: auto;
+             transition: all 240ms var(--ease); }
+  .capture { grid-area: capture;  border-top: 1px solid var(--border);
+             padding: 8px 20px; background: var(--bg);
+             display: flex; align-items: center; gap: 12px;
+             position: relative; }
+
+  .search-input { width: 280px; padding: 8px 12px 8px 32px; border: 1px solid var(--border);
+                  border-radius: 8px; background: var(--surface); font-size: 13px; color: var(--fg);
+                  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
+                  background-repeat: no-repeat; background-position: 10px center; background-size: 14px; }
+
+  /* Sidebar */
+  .side-h { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+            color: var(--muted); font-weight: 600; padding: 0 8px; margin: 16px 0 6px; }
+  .side-h:first-child { margin-top: 0; }
+  .side-item { display: flex; align-items: center; padding: 6px 10px; font-size: 13px;
+               border-radius: 6px; cursor: pointer; transition: background 120ms; color: var(--fg); }
+  .side-item:hover  { background: var(--surface-2); }
+  .side-item.active { background: var(--brand-soft); color: var(--brand); font-weight: 500; }
+  .side-item .meta  { margin-left: auto; font-size: 11px; color: var(--muted); }
+
+  /* Worker status dots */
+  .workers { position: absolute; bottom: 12px; left: 12px; display: flex; gap: 4px;
+             font-size: 10px; color: var(--muted); }
+  .worker-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--st-done); }
+  .worker-dot[data-state="unknown"] { background: var(--muted); }
+  .worker-dot[data-state="warn"]    { background: var(--st-waiting); }
+  .worker-dot[data-state="down"]    { background: oklch(60% 0.21 25); }
+
+  /* Main timeline */
+  .main-h    { display: flex; align-items: baseline; gap: 12px; margin-bottom: 24px; }
+  .main-date { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+  .main-meta { color: var(--muted); font-size: 13px; }
+
+  /* Section header */
+  .sec-h { display: flex; align-items: center; gap: 8px; padding: 16px 0 8px;
+           border-top: 1px solid var(--border); margin-top: 20px;
+           font-size: 11px; font-weight: 600; text-transform: uppercase;
+           letter-spacing: 0.05em; color: var(--muted); }
+  .sec-h:first-of-type { border-top: 0; margin-top: 0; padding-top: 0; }
+
+  /* Timeline rows */
+  .timeline { position: relative; }
+  .timeline::before { content: ''; position: absolute; left: 56px; top: 8px; bottom: 0;
+                      width: 1px; background: var(--border); }
+  .row { display: flex; align-items: center; padding: 10px 8px; cursor: pointer;
+         border-radius: 8px; transition: background 120ms; }
+  .row:hover    { background: var(--surface-2); }
+  .row.selected { background: var(--brand-soft); }
+  .row .time    { width: 56px; font-family: 'JetBrains Mono', monospace; font-size: 12px;
+                  color: var(--muted); padding-left: 4px; flex-shrink: 0; }
+  .row .dot-wrap { width: 24px; display: flex; justify-content: center; flex-shrink: 0; }
+  .row .icon    { font-size: 14px; width: 24px; text-align: center; flex-shrink: 0; }
+  .row .body    { flex: 1; padding: 0 12px; min-width: 0; }
+  .row .title   { font-size: 14px; font-weight: 500; white-space: nowrap;
+                  overflow: hidden; text-overflow: ellipsis; }
+  .row .title.done { text-decoration: line-through; color: var(--muted); }
+  .row .meta-line  { display: flex; gap: 6px; align-items: center; margin-top: 2px;
+                     font-size: 11px; color: var(--muted); flex-wrap: wrap; }
+  .row .status-btn { background: none; border: none; cursor: pointer; padding: 2px 6px;
+                     color: var(--muted); font-size: 11px; border-radius: 4px; }
+  .row .status-btn:hover { background: var(--surface-2); color: var(--fg); }
+
+  /* Context panel */
+  .panel-empty { padding: 40px 20px; text-align: center; color: var(--muted); font-size: 13px; }
+
+  /* Quick Capture */
+  .capture-input { flex: 1; padding: 8px 12px; border: 1px solid var(--border);
+                   border-radius: 8px; background: var(--surface); font-size: 13px; color: var(--fg); }
+  .capture .hint { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+  /* AI suggestion chips */
+  .ai-suggest {
+    position: absolute; bottom: 64px; left: 56px; right: 20px;
+    display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+    pointer-events: none; opacity: 0; transition: opacity 150ms;
+  }
+  .ai-suggest.visible { pointer-events: auto; opacity: 1; }
+  .ai-chip {
+    font-size: 11px; padding: 3px 10px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--muted); cursor: pointer; transition: all 100ms;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .ai-chip:hover { background: var(--brand-soft); color: var(--brand); border-color: var(--brand); }
+  .ai-chip.type-chip { border-color: var(--brand-soft); color: var(--brand); background: var(--brand-soft); font-weight: 600; }
+
+  /* Focused item highlight in flow list */
+  .row.kbd-focus { background: var(--brand-soft) !important; outline: 2px solid var(--brand); outline-offset: -2px; border-radius: 6px; }
+
+  /* Mic button states */
+  .mic-btn {
+    width: 34px; height: 34px; border-radius: 50%; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    font-size: 15px; transition: transform 120ms, background 200ms;
+    background: var(--brand); color: white;
+  }
+  .mic-btn:hover { transform: scale(1.06); }
+  .mic-btn[data-state="recording"] {
+    background: oklch(60% 0.21 25);
+    animation: mic-pulse 900ms ease-in-out infinite;
+  }
+  .mic-btn[data-state="processing"] {
+    background: var(--accent); cursor: default;
+    animation: mic-spin 1s linear infinite;
+  }
+  .mic-btn[data-state="unavailable"] {
+    background: var(--surface-2); color: var(--muted); cursor: not-allowed;
+  }
+  @keyframes mic-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 oklch(60% 0.21 25 / 0.5); }
+    50%       { box-shadow: 0 0 0 8px oklch(60% 0.21 25 / 0); }
+  }
+  @keyframes mic-spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="app">
+
+  <!-- TOPBAR -->
+  {% set active_nav = 'flow' %}
+  {% include "partials/topbar.html" %}
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="side-h">소속</div>
+    {% for org in organizations %}
+    <div class="side-item {% if loop.first %}active{% endif %}"
+         style="cursor:pointer;"
+         hx-get="/partial/flow?org_id={{ org.id }}"
+         hx-target="#flow-content"
+         hx-swap="innerHTML">
+      🏢 {{ org.name }}<span class="meta">{{ org.project_count }}</span>
+    </div>
+    {% else %}
+    <div class="side-item" style="color: var(--muted);">— 소속 없음</div>
+    {% endfor %}
+    <div class="side-item"
+         hx-get="/partial/flow"
+         hx-target="#flow-content"
+         hx-swap="innerHTML">
+      📁 무소속
+    </div>
+
+    <div class="side-h">태그</div>
+    {% for tag in tags %}
+    <div class="side-item"
+         hx-get="/partial/flow?tag={{ tag.name }}"
+         hx-target="#flow-content"
+         hx-swap="innerHTML">
+      #{{ tag.name }}<span class="meta">{{ tag.cnt }}</span>
+    </div>
+    {% endfor %}
+
+    <!-- Worker status dots (ADR-006) -->
+    <div class="workers">
+      {% for name, state in worker_statuses.items() %}
+      <span class="worker-dot" data-state="{{ state }}" title="{{ name }}: {{ state }}"></span>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- MAIN TIMELINE -->
+  <div class="main">
+    <div class="main-h">
+      <span class="main-date">{{ date_korean }}</span>
+      <span class="main-meta">{{ weekday_korean }}요일 · 오늘 {{ total_items }}개 · 미배정 {{ unscheduled_count }}개</span>
+      <button onclick="openQuickSched()" title="새 일정 등록"
+              style="margin-left:auto; padding:5px 12px; font-size:12px;
+                     background:var(--brand-soft); color:var(--brand);
+                     border:1px solid var(--brand); border-radius:7px;
+                     cursor:pointer; font-family:inherit; font-weight:500;">
+        📅 새 일정
+      </button>
+    </div>
+
+    <div id="flow-content"
+         hx-get="/partial/flow"
+         hx-trigger="every 60s"
+         hx-swap="innerHTML">
+      {% include "partials/flow_list.html" %}
+    </div>
+  </div>
+
+  <!-- CONTEXT PANEL (right) -->
+  <div class="panel">
+    <div id="context-panel">
+      <div class="panel-empty">
+        항목을 선택하면<br>컨텍스트가 여기 표시됩니다
+      </div>
+    </div>
+  </div>
+
+  <!-- QUICK CAPTURE -->
+  <div class="capture">
+    <button id="mic-btn" class="mic-btn" data-state="idle" title="음성 캡처 (클릭하여 녹음)">🎤</button>
+    <input id="capture-input" class="capture-input"
+           placeholder="빠른 캡처 — '/today 14:00 회의 #urgent @MC' (Enter ↵)"
+           autocomplete="off">
+    <span class="hint" id="capture-hint" style="font-family:'JetBrains Mono',monospace;">/today /memo /sched · #tag · @proj</span>
+    <div id="capture-preview" style="position:absolute; bottom:64px; left:60px;
+         background:var(--surface); border:1px solid var(--brand); border-radius:10px;
+         padding:8px 14px; font-size:12px; box-shadow:0 8px 24px oklch(0% 0 0 / 0.12);
+         display:none; max-width:520px;"></div>
+    <div id="ai-suggest" class="ai-suggest"></div>
+  </div>
+
+</div>
+
+<!-- ── Quick Schedule Modal ─────────────────────────────────────── -->
+<div id="qs-backdrop" onclick="closeQuickSched()"
+     style="display:none; position:fixed; inset:0; background:oklch(0% 0 0 / 0.35);
+            z-index:200; align-items:center; justify-content:center;">
+  <div onclick="event.stopPropagation()"
+       style="background:var(--surface); border-radius:16px; padding:24px;
+              width:min(480px, 90vw); box-shadow:0 24px 64px oklch(0% 0 0 / 0.2);
+              border:1px solid var(--border);">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
+      <span style="font-size:16px; font-weight:700;">새 일정 · 미팅 등록</span>
+      <button onclick="closeQuickSched()"
+              style="background:none; border:none; color:var(--muted); font-size:18px; cursor:pointer;">✕</button>
+    </div>
+
+    <!-- Type -->
+    <div style="display:flex; gap:6px; margin-bottom:14px;" id="qs-type-seg">
+      <button class="qs-type-btn active" data-type="schedule" onclick="qsSetType('schedule',this)"
+              style="flex:1; padding:7px; font-size:12px; border-radius:7px;
+                     border:1px solid var(--brand); background:var(--brand-soft);
+                     color:var(--brand); cursor:pointer; font-family:inherit; font-weight:600;">★ 일정·미팅</button>
+      <button class="qs-type-btn" data-type="task" onclick="qsSetType('task',this)"
+              style="flex:1; padding:7px; font-size:12px; border-radius:7px;
+                     border:1px solid var(--border); background:var(--bg);
+                     color:var(--muted); cursor:pointer; font-family:inherit;">☐ 할 일</button>
+    </div>
+
+    <!-- Title -->
+    <input id="qs-title" type="text" placeholder="미팅 이름, 약속 내용..."
+           autocomplete="off"
+           style="width:100%; padding:10px 12px; font-size:14px; font-family:inherit;
+                  border:1px solid var(--border); border-radius:9px; background:var(--bg);
+                  color:var(--fg); outline:none; box-sizing:border-box; margin-bottom:12px;"
+           onfocus="this.style.borderColor='var(--brand)'"
+           onblur="this.style.borderColor='var(--border)'"
+           onkeydown="if(event.key==='Enter')qsSubmit()">
+
+    <!-- Date + Time row -->
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px;">
+      <div>
+        <div style="font-size:10px; font-weight:600; color:var(--muted); margin-bottom:4px; text-transform:uppercase; letter-spacing:.05em;">날짜</div>
+        <input id="qs-date" type="date"
+               style="width:100%; padding:8px 10px; font-size:13px; font-family:inherit;
+                      border:1px solid var(--border); border-radius:8px; background:var(--bg);
+                      color:var(--fg); outline:none; box-sizing:border-box;">
+      </div>
+      <div>
+        <div style="font-size:10px; font-weight:600; color:var(--muted); margin-bottom:4px; text-transform:uppercase; letter-spacing:.05em;">시간 (선택)</div>
+        <input id="qs-time" type="time"
+               style="width:100%; padding:8px 10px; font-size:13px; font-family:inherit;
+                      border:1px solid var(--border); border-radius:8px; background:var(--bg);
+                      color:var(--fg); outline:none; box-sizing:border-box;">
+      </div>
+    </div>
+
+    <!-- Project -->
+    <div style="margin-bottom:16px;">
+      <div style="font-size:10px; font-weight:600; color:var(--muted); margin-bottom:4px; text-transform:uppercase; letter-spacing:.05em;">프로젝트 연결 (선택)</div>
+      <select id="qs-project"
+              style="width:100%; padding:8px 10px; font-size:13px; font-family:inherit;
+                     border:1px solid var(--border); border-radius:8px; background:var(--bg);
+                     color:var(--fg); outline:none;">
+        <option value="">— 프로젝트 없이 (개인 일정·미팅)</option>
+        {% for p in projects %}
+        <option value="{{ p.id }}">
+          {%- if p.org_name %}{{ p.org_name }} / {% endif -%}
+          {%- if p.biz_name %}{{ p.biz_name }} / {% endif -%}
+          {{ p.title }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div id="qs-error" style="font-size:12px; color:oklch(50% 0.22 20); margin-bottom:8px;"></div>
+    <button id="qs-btn" onclick="qsSubmit()"
+            style="width:100%; padding:12px; background:var(--brand); color:white; border:none;
+                   border-radius:9px; font-size:14px; font-weight:600; cursor:pointer;
+                   font-family:inherit;">등록</button>
+  </div>
+</div>
+
+<script>
+// ── Quick Schedule Modal ─────────────────────────────────────────
+let _qsType = 'schedule';
+
+function openQuickSched(dateStr) {
+  const today = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  document.getElementById('qs-date').value = dateStr ||
+    `${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`;
+  document.getElementById('qs-time').value = '';
+  document.getElementById('qs-title').value = '';
+  document.getElementById('qs-project').value = '';
+  document.getElementById('qs-error').textContent = '';
+  // Reset type to schedule
+  _qsType = 'schedule';
+  document.querySelectorAll('.qs-type-btn').forEach(b => {
+    const active = b.dataset.type === 'schedule';
+    b.style.background   = active ? 'var(--brand-soft)' : 'var(--bg)';
+    b.style.color        = active ? 'var(--brand)'      : 'var(--muted)';
+    b.style.borderColor  = active ? 'var(--brand)'      : 'var(--border)';
+    b.style.fontWeight   = active ? '600'               : 'normal';
+  });
+  const bd = document.getElementById('qs-backdrop');
+  bd.style.display = 'flex';
+  setTimeout(() => document.getElementById('qs-title').focus(), 60);
+}
+
+function closeQuickSched() {
+  document.getElementById('qs-backdrop').style.display = 'none';
+}
+
+function qsSetType(type, btn) {
+  _qsType = type;
+  document.querySelectorAll('.qs-type-btn').forEach(b => {
+    const isActive = b === btn;
+    b.style.background = isActive ? 'var(--brand-soft)' : 'var(--bg)';
+    b.style.color      = isActive ? 'var(--brand)'      : 'var(--muted)';
+    b.style.borderColor = isActive ? 'var(--brand)'     : 'var(--border)';
+    b.style.fontWeight = isActive ? '600' : 'normal';
+  });
+}
+
+async function qsSubmit() {
+  const title = document.getElementById('qs-title').value.trim();
+  if (!title) {
+    document.getElementById('qs-error').textContent = '제목을 입력하세요';
+    return;
+  }
+  const date = document.getElementById('qs-date').value;
+  const time = document.getElementById('qs-time').value;
+  const project_id = document.getElementById('qs-project').value;
+  const scheduled_at = date
+    ? (time ? `${date}T${time}:00Z` : `${date}T00:00:00Z`)
+    : '';
+  const btn = document.getElementById('qs-btn');
+  btn.disabled = true; btn.textContent = '등록 중...';
+  try {
+    const fd = new FormData();
+    fd.append('title', title);
+    fd.append('type', _qsType);
+    if (scheduled_at) fd.append('scheduled_at', scheduled_at);
+    if (project_id)   fd.append('project_id', project_id);
+    const res = await fetch('/api/items', {method:'POST', body:fd});
+    if (!res.ok) throw new Error(await res.text());
+    closeQuickSched();
+    // Refresh flow list
+    htmx.ajax('GET', '/partial/flow', {target:'#flow-content', swap:'innerHTML'});
+  } catch(err) {
+    document.getElementById('qs-error').textContent = '오류: ' + err.message;
+  } finally {
+    btn.disabled = false; btn.textContent = '등록';
+  }
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.getElementById('qs-backdrop').style.display !== 'none') {
+    closeQuickSched();
+  }
+});
+</script>
+
+<script>
+// ── Slash Commands parser for Quick Capture ──────────────────────
+// Syntax: "[/today|/tomorrow|/d+N] [HH:MM|HH시] [/m|/memo|/s|/sched] title #tag1 #tag2 @projectName"
+function parseCapture(raw) {
+  let s = raw.trim();
+  let type = 'task';
+  let scheduled_at = null;
+  let project_hint = null;
+  const tags = [];
+
+  // Type tokens
+  s = s.replace(/^\/m(emo)?\b\s*/i, () => { type = 'memo';     return ''; });
+  s = s.replace(/^\/s(ched(ule)?)?\b\s*/i, () => { type = 'schedule'; return ''; });
+
+  // Date token: /today, /tomorrow, /d+N (N days)
+  const now = new Date();
+  let target = null;
+  s = s.replace(/^\/today\b\s*/i, () => {
+    target = new Date(now); return '';
+  });
+  s = s.replace(/^\/tomorrow\b\s*/i, () => {
+    target = new Date(now); target.setDate(target.getDate()+1); return '';
+  });
+  s = s.replace(/^\/d\+(\d+)\b\s*/i, (_, n) => {
+    target = new Date(now); target.setDate(target.getDate()+parseInt(n,10)); return '';
+  });
+
+  // Time token: 14:00 or 14시
+  s = s.replace(/^(\d{1,2}):(\d{2})\b\s*/, (_, h, m) => {
+    if (!target) target = new Date(now);
+    target.setHours(parseInt(h,10), parseInt(m,10), 0, 0);
+    return '';
+  });
+  s = s.replace(/^(\d{1,2})시\s*/, (_, h) => {
+    if (!target) target = new Date(now);
+    target.setHours(parseInt(h,10), 0, 0, 0);
+    return '';
+  });
+
+  if (target) {
+    const pad = n => String(n).padStart(2, '0');
+    scheduled_at = `${target.getFullYear()}-${pad(target.getMonth()+1)}-${pad(target.getDate())}T${pad(target.getHours())}:${pad(target.getMinutes())}:00Z`;
+  }
+
+  // Tags: #word (collect, strip)
+  s = s.replace(/(?:^|\s)#([\p{L}\p{N}_-]+)/gu, (_, t) => {
+    tags.push(t); return '';
+  });
+
+  // Project hint: @word (just the first one)
+  const projMatch = s.match(/(?:^|\s)@([\p{L}\p{N}_-]+)/u);
+  if (projMatch) {
+    project_hint = projMatch[1];
+    s = s.replace(projMatch[0], '');
+  }
+
+  return { title: s.trim(), type, scheduled_at, tags, project_hint };
+}
+
+const captureInp = document.getElementById('capture-input');
+const capturePrev = document.getElementById('capture-preview');
+
+function updatePreview() {
+  const p = parseCapture(captureInp.value);
+  const parts = [];
+  if (p.type !== 'task') parts.push(`<b>${p.type}</b>`);
+  if (p.scheduled_at) parts.push(`📅 ${p.scheduled_at.slice(0,16).replace('T',' ')}`);
+  if (p.project_hint) parts.push(`📂 @${p.project_hint}`);
+  if (p.tags.length) parts.push(p.tags.map(t => '#'+t).join(' '));
+  if (parts.length && p.title) {
+    capturePrev.innerHTML = parts.join(' · ') + '<br><span style="color:var(--fg); font-weight:500;">' + p.title + '</span>';
+    capturePrev.style.display = 'block';
+  } else {
+    capturePrev.style.display = 'none';
+  }
+}
+
+captureInp.addEventListener('input', updatePreview);
+captureInp.addEventListener('blur', () => setTimeout(() => capturePrev.style.display = 'none', 100));
+
+captureInp.addEventListener('keydown', async (e) => {
+  if (e.key === 'Enter' && captureInp.value.trim()) {
+    e.preventDefault();
+    const p = parseCapture(captureInp.value);
+    if (!p.title) return;
+    const fd = new FormData();
+    fd.append('title', p.title);
+    fd.append('type', p.type);
+    if (p.scheduled_at) fd.append('scheduled_at', p.scheduled_at);
+    // Find project_id by hint match
+    if (p.project_hint) {
+      try {
+        const res = await fetch('/api/cmdk?q=' + encodeURIComponent(p.project_hint));
+        const data = await res.json();
+        const proj = (data.results || []).find(r => r.kind === 'project');
+        if (proj) fd.append('project_id', proj.id);
+      } catch (_) {}
+    }
+    const res = await fetch('/api/items', {method: 'POST', body: fd});
+    const html = await res.text();
+    // Insert into anytime-list
+    const list = document.getElementById('anytime-list');
+    if (list) list.insertAdjacentHTML('afterbegin', html);
+    // Add tags after item creation (extract item_id from response)
+    const newId = html.match(/id="item-(\d+)"/)?.[1];
+    if (newId && p.tags.length) {
+      for (const tag of p.tags) {
+        const tfd = new FormData();
+        tfd.append('tag_name', tag);
+        await fetch('/api/items/' + newId + '/tags', {method: 'POST', body: tfd});
+      }
+    }
+    captureInp.value = '';
+    capturePrev.style.display = 'none';
+  }
+});
+
+// ── Voice Capture (Whisper) ─────────────────────────────────────────
+(async () => {
+  const btn = document.getElementById('mic-btn');
+  let recorder = null;
+  let chunks = [];
+  let stream = null;
+
+  /* Check if server Whisper is available */
+  try {
+    const s = await fetch('/api/voice/status');
+    const d = await s.json();
+    if (!d.available) { btn.dataset.state = 'unavailable'; btn.title = 'Whisper 미설치'; }
+  } catch (_) { btn.dataset.state = 'unavailable'; }
+
+  function setState(s) {
+    btn.dataset.state = s;
+    const icons = { idle: '🎤', recording: '⏹', processing: '⏳', unavailable: '🎤' };
+    btn.textContent = icons[s] || '🎤';
+  }
+
+  async function startRecording() {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (e) {
+      alert('마이크 접근 권한이 필요합니다');
+      return;
+    }
+    chunks = [];
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+      ? 'audio/webm;codecs=opus'
+      : 'audio/webm';
+    recorder = new MediaRecorder(stream, { mimeType });
+    recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+    recorder.onstop = async () => {
+      setState('processing');
+      stream.getTracks().forEach(t => t.stop());
+      const blob = new Blob(chunks, { type: mimeType });
+      const fd = new FormData();
+      fd.append('audio', blob, 'capture.webm');
+      try {
+        const r = await fetch('/api/voice/transcribe', { method: 'POST', body: fd });
+        if (!r.ok) throw new Error(await r.text());
+        const d = await r.json();
+        const txt = d.text?.trim();
+        if (txt) {
+          captureInp.value = txt;
+          captureInp.focus();
+          updatePreview();
+        } else {
+          captureInp.placeholder = '(음성 인식 결과 없음 — 다시 시도)';
+          setTimeout(() => { captureInp.placeholder = "빠른 캡처 — '/today 14:00 회의 #urgent @MC' (Enter ↵)"; }, 3000);
+        }
+      } catch (err) {
+        console.error('Transcription error:', err);
+        captureInp.placeholder = '음성 인식 오류 — 서버 로그 확인';
+        setTimeout(() => { captureInp.placeholder = "빠른 캡처 — '/today 14:00 회의 #urgent @MC' (Enter ↵)"; }, 3000);
+      }
+      setState('idle');
+    };
+    recorder.start();
+    setState('recording');
+  }
+
+  function stopRecording() {
+    if (recorder && recorder.state !== 'inactive') recorder.stop();
+  }
+
+  btn.addEventListener('click', () => {
+    const s = btn.dataset.state;
+    if (s === 'unavailable' || s === 'processing') return;
+    if (s === 'recording') stopRecording();
+    else startRecording();
+  });
+})();
+
+// ── AI 자동 분류 제안 ─────────────────────────────────────────────
+(function() {
+  const suggestEl = document.getElementById('ai-suggest');
+  let suggestTimer = null;
+  let lastQ = '';
+
+  async function fetchSuggest(q) {
+    if (!q || q.length < 3) { hideSuggest(); return; }
+    try {
+      const r = await fetch('/api/ai/suggest?q=' + encodeURIComponent(q));
+      const d = await r.json();
+      renderSuggest(q, d);
+    } catch (_) {}
+  }
+
+  function hideSuggest() {
+    suggestEl.classList.remove('visible');
+    suggestEl.innerHTML = '';
+  }
+
+  function renderSuggest(q, d) {
+    const chips = [];
+    /* Type chip if not task */
+    if (d.type && d.type !== 'task') {
+      const typeLabels = {schedule: '📅 일정', memo: '📝 메모'};
+      const chip = document.createElement('span');
+      chip.className = 'ai-chip type-chip';
+      chip.textContent = typeLabels[d.type] || d.type;
+      chip.title = '클릭하여 적용 (/ 명령어 삽입)';
+      chip.onclick = () => {
+        const prefix = d.type === 'memo' ? '/memo ' : '/sched ';
+        if (!captureInp.value.startsWith('/')) captureInp.value = prefix + captureInp.value;
+        captureInp.focus();
+        hideSuggest();
+      };
+      chips.push(chip);
+    }
+    /* Tag chips */
+    for (const tag of (d.tags || []).slice(0, 3)) {
+      const chip = document.createElement('span');
+      chip.className = 'ai-chip';
+      chip.textContent = '#' + tag.name;
+      chip.title = '태그 추가';
+      chip.onclick = () => {
+        if (!captureInp.value.includes('#' + tag.name))
+          captureInp.value += ' #' + tag.name;
+        captureInp.focus();
+        hideSuggest();
+      };
+      chips.push(chip);
+    }
+    /* Project chip */
+    if (d.project) {
+      const chip = document.createElement('span');
+      chip.className = 'ai-chip';
+      chip.textContent = '📂 @' + d.project.title;
+      chip.title = '프로젝트 추가';
+      chip.onclick = () => {
+        const slug = d.project.title.replace(/\s+/g, '_');
+        if (!captureInp.value.includes('@')) captureInp.value += ' @' + slug;
+        captureInp.focus();
+        hideSuggest();
+      };
+      chips.push(chip);
+    }
+
+    if (chips.length === 0) { hideSuggest(); return; }
+    suggestEl.innerHTML = '<span style="font-size:10px;color:var(--muted);margin-right:2px;">AI ✦</span>';
+    chips.forEach(c => suggestEl.appendChild(c));
+    suggestEl.classList.add('visible');
+  }
+
+  captureInp.addEventListener('input', () => {
+    const q = captureInp.value.trim();
+    if (q === lastQ) return;
+    lastQ = q;
+    clearTimeout(suggestTimer);
+    if (q.length < 3) { hideSuggest(); return; }
+    suggestTimer = setTimeout(() => fetchSuggest(q), 600);
+  });
+  captureInp.addEventListener('blur', () => setTimeout(hideSuggest, 200));
+})();
+
+// ── 키보드 내비게이션 (j/k/Enter/d/e) ──────────────────────────────
+(function() {
+  let focusedRow = null;
+
+  function rows() {
+    return [...document.querySelectorAll('.row[id^="item-"]')];
+  }
+
+  function setFocus(el) {
+    if (focusedRow) focusedRow.classList.remove('kbd-focus');
+    focusedRow = el;
+    if (el) {
+      el.classList.add('kbd-focus');
+      el.scrollIntoView({block: 'nearest'});
+    }
+  }
+
+  function getFocusedIndex() {
+    if (!focusedRow) return -1;
+    return rows().indexOf(focusedRow);
+  }
+
+  document.addEventListener('keydown', (e) => {
+    /* Skip when typing in an input */
+    const tag = document.activeElement?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if (document.getElementById('cmdk-overlay')?.style.display === 'flex') return;
+
+    const list = rows();
+    const idx = getFocusedIndex();
+
+    if (e.key === 'j' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      setFocus(list[Math.min(idx + 1, list.length - 1)]);
+    } else if (e.key === 'k' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      setFocus(list[Math.max(idx - 1, 0)]);
+    } else if ((e.key === 'Enter' || e.key === ' ') && focusedRow) {
+      e.preventDefault();
+      focusedRow.click();
+    } else if (e.key === 'e' && focusedRow) {
+      /* Edit title of focused item */
+      const id = focusedRow.id.replace('item-', '');
+      focusedRow.click();
+      setTimeout(() => ctxEditTitle && ctxEditTitle(id), 300);
+    } else if (e.key === 'd' && focusedRow) {
+      /* Quick done */
+      e.preventDefault();
+      const id = focusedRow.id.replace('item-', '');
+      const fd = new FormData(); fd.append('status', 'done');
+      fetch('/api/items/' + id, {method: 'PATCH', body: fd}).then(() => {
+        focusedRow.style.opacity = '0.4';
+        setTimeout(() => { const next = rows().find(r => r !== focusedRow); setFocus(next || null); }, 500);
+      });
+    } else if (e.key === '/' && !e.shiftKey) {
+      e.preventDefault();
+      captureInp.focus();
+    } else if (e.key === 'Escape') {
+      setFocus(null);
+    }
+  });
+})();
+</script>
+
+{% endblock %}

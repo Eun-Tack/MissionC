@@ -1,0 +1,91 @@
+{#
+  Business block partial — used in hierarchy.html and CRUD responses.
+  Context: biz (dict with id, name, description, org_id, projects list)
+#}
+<div id="biz-{{ biz.id }}" class="biz-block">
+  <div class="biz-header">
+    <span style="font-size:16px;">🗂</span>
+    <span class="biz-name">{{ biz.name }}</span>
+    {% if biz.description %}
+    <span class="biz-desc">— {{ biz.description }}</span>
+    {% endif %}
+    <button class="icon-btn" style="margin-left:auto;"
+            hx-delete="/api/businesses/{{ biz.id }}"
+            hx-target="closest .org-section"
+            hx-swap="outerHTML"
+            hx-confirm="'{{ biz.name }}' 사업을 삭제하시겠습니까? (프로젝트가 없어야 합니다)"
+            title="사업 삭제">×</button>
+  </div>
+
+  {% if biz.projects %}
+  <div class="proj-grid">
+    {% for p in biz.projects %}
+    <div class="proj-card-wrap" style="position:relative;">
+      <a class="proj-card" href="/project/{{ p.id }}" data-status="{{ p.status }}">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+          <div class="proj-title">{{ p.title }}</div>
+          <span class="status-badge" data-s="{{ p.status }}">
+            {{ {'active':'진행중','planning':'기획','review':'검토','done':'완료','paused':'중단'}.get(p.status, p.status) }}
+          </span>
+        </div>
+        {% if p.start_date or p.end_date %}
+        <div class="proj-dates">{{ p.start_date or '—' }} → {{ p.end_date or '계속' }}</div>
+        {% endif %}
+
+        {% if p.item_count > 0 %}
+        <div class="proj-progress">
+          <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--muted);">
+            <span>{{ p.done_count }} / {{ p.item_count }}</span>
+            <span>{{ p.progress_pct }}%</span>
+          </div>
+          <div class="prog-bar">
+            <div class="prog-fill" data-status="{{ p.status }}" style="width:{{ p.progress_pct }}%;"></div>
+          </div>
+        </div>
+        {% endif %}
+
+        <div class="proj-footer">
+          {% for stage in p.stages %}
+          <span class="stage-chip" data-s="{{ stage.status }}">{{ stage.name }}</span>
+          {% endfor %}
+          {% if p.github_repo %}
+          <span class="github-link" style="margin-left:auto;">🐙 {{ p.github_repo }}</span>
+          {% endif %}
+        </div>
+      </a>
+      <button class="proj-archive-btn"
+              hx-delete="/api/projects/{{ p.id }}"
+              hx-target="#biz-{{ biz.id }}"
+              hx-swap="outerHTML"
+              hx-confirm="'{{ p.title }}' 프로젝트를 보관하시겠습니까?"
+              title="보관">⋯</button>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div style="font-size:12px; color:var(--muted); padding:8px 0 12px;">프로젝트 없음</div>
+  {% endif %}
+
+  <!-- Add project inline form -->
+  <div class="add-inline-form" id="add-proj-form-{{ biz.id }}" style="display:none;">
+    <form hx-post="/api/projects"
+          hx-target="#biz-{{ biz.id }}"
+          hx-swap="outerHTML"
+          style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
+      <input type="hidden" name="business_id" value="{{ biz.id }}">
+      <input class="h-input" type="text" name="title"
+             placeholder="프로젝트 이름" style="flex:2; min-width:160px;" required autofocus>
+      <select class="h-input" name="status" style="flex:0 0 auto;">
+        <option value="planning">기획</option>
+        <option value="active">진행중</option>
+      </select>
+      <input class="h-input" type="text" name="github_repo"
+             placeholder="owner/repo (선택)" style="flex:1; min-width:120px;">
+      <button type="submit" class="h-btn-primary">추가</button>
+      <button type="button" class="h-btn-ghost"
+              onclick="document.getElementById('add-proj-form-{{ biz.id }}').style.display='none'">취소</button>
+    </form>
+  </div>
+  <button class="h-btn-add"
+          onclick="toggleAddForm('add-proj-form-{{ biz.id }}')">+ 프로젝트</button>
+</div>

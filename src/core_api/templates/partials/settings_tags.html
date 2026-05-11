@@ -1,0 +1,32 @@
+{#
+  Tag list partial — used in settings page.
+  Context: tags (list of dicts: id, name, color_hue, usage_count)
+#}
+<div id="tag-list">
+  {% if tags %}
+  {% for tag in tags %}
+  <div style="display:flex; align-items:center; gap:10px; padding:8px 12px;
+              background:var(--surface); border:1px solid var(--border);
+              border-radius:10px; margin-bottom:6px;">
+    <span style="width:10px; height:10px; border-radius:50%; flex-shrink:0;
+                 background:oklch(60% 0.18 {{ tag.color_hue }});"></span>
+    <span style="font-size:13px; font-weight:500; flex:1;">{{ tag.name }}</span>
+    {% if tag.usage_count %}
+    <span style="font-size:10px; color:var(--muted); background:var(--surface-2);
+                 padding:1px 7px; border-radius:999px;">{{ tag.usage_count }}개 항목</span>
+    {% endif %}
+    <button style="background:none; border:none; color:var(--muted); cursor:pointer;
+                   font-size:16px; padding:0 4px; line-height:1;"
+            hx-delete="/settings/tags/{{ tag.id }}"
+            hx-target="#tag-list"
+            hx-swap="outerHTML"
+            hx-confirm="'{{ tag.name }}' 태그를 삭제하시겠습니까?"
+            title="삭제">×</button>
+  </div>
+  {% endfor %}
+  {% else %}
+  <div style="text-align:center; padding:20px; color:var(--muted); font-size:13px;">
+    등록된 태그 없음
+  </div>
+  {% endif %}
+</div>

@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}MC{% endblock %}</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/htmx.org@1.9.12/dist/htmx.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css">
+<style>
+  :root {
+    --bg: oklch(99% 0.005 270); --fg: oklch(20% 0.02 270);
+    --muted: oklch(55% 0.015 270); --border: oklch(92% 0.01 270);
+    --surface: oklch(98% 0.005 270); --surface-2: oklch(96% 0.008 270);
+    --brand: oklch(58% 0.18 280); --brand-soft: oklch(95% 0.04 280);
+    --accent: oklch(70% 0.15 200);
+    --st-todo: oklch(60% 0.02 270); --st-doing: oklch(60% 0.18 240);
+    --st-done: oklch(60% 0.16 145); --st-waiting: oklch(70% 0.14 80);
+    --gcal: oklch(55% 0.20 250);
+    --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: oklch(15% 0.01 270); --fg: oklch(94% 0.005 270);
+      --muted: oklch(65% 0.015 270); --border: oklch(28% 0.015 270);
+      --surface: oklch(20% 0.01 270); --surface-2: oklch(24% 0.012 270);
+      --brand-soft: oklch(28% 0.06 280);
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; font-family: 'Pretendard Variable', system-ui, sans-serif;
+               background: var(--bg); color: var(--fg); font-feature-settings: 'cv11'; }
+
+  /* Status dots */
+  .mc-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .mc-dot[data-status="todo"]    { background: var(--st-todo); }
+  .mc-dot[data-status="doing"]   { background: var(--st-doing); box-shadow: 0 0 0 3px oklch(60% 0.18 240 / 0.15); }
+  .mc-dot[data-status="done"]    { background: var(--st-done); }
+  .mc-dot[data-status="waiting"] { background: var(--st-waiting); }
+
+  /* Labels */
+  .label { display: inline-flex; align-items: center; padding: 1px 6px;
+           font-size: 10px; font-weight: 500; border-radius: 999px; }
+  .label[data-type="확인 필요"] { background: oklch(95% 0.06 80);  color: oklch(35% 0.18 80); }
+  .label[data-type="블로킹"]   { background: oklch(94% 0.06 25);  color: oklch(40% 0.21 25); }
+  .label[data-type="중요"]     { background: oklch(94% 0.06 50);  color: oklch(40% 0.18 50); }
+  .label[data-type="검토중"]   { background: oklch(94% 0.05 240); color: oklch(35% 0.18 240); }
+  .label[data-type="완료 대기"] { background: var(--surface-2); color: var(--muted); }
+
+  /* Tag chips */
+  .tag-chip { font-size: 11px; padding: 1px 6px; background: var(--surface-2);
+              border-radius: 4px; color: var(--muted); }
+
+  /* Label chips (returned by /api/items/{id}/labels) */
+  .label-chip { font-size: 11px; padding: 2px 8px; border-radius: 999px;
+                font-weight: 500; display: inline-block; }
+
+  /* GCal badge */
+  .gcal-badge { display: inline-flex; align-items: center; gap: 3px;
+                font-size: 10px; padding: 1px 5px; color: var(--gcal);
+                background: oklch(96% 0.03 250); border-radius: 4px; font-weight: 500; }
+
+  /* Memo lifecycle pulse (FR-MEMO-07) */
+  @keyframes mc-breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+  .lifecycle-mark {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--brand);
+    animation: mc-breathe 3.6s ease-in-out infinite; display: inline-block;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .lifecycle-mark { animation: none; }
+    * { animation: none !important; transition-duration: 0ms !important; }
+  }
+
+  /* HTMX loading indicator */
+  .htmx-indicator { opacity: 0; transition: opacity 200ms; }
+  .htmx-request .htmx-indicator { opacity: 1; }
+  .htmx-request.htmx-indicator { opacity: 1; }
+
+  /* Shared topbar */
+  .topbar { border-bottom: 1px solid var(--border); display: flex; align-items: center;
+            padding: 0 20px; gap: 16px; height: 56px; background: var(--bg);
+            position: sticky; top: 0; z-index: 10; }
+  .logo   { font-weight: 800; font-size: 18px; letter-spacing: -0.01em;
+            color: var(--brand); text-decoration: none; }
+  .nav    { display: flex; gap: 4px; margin-left: 16px; }
+  .nav a  { padding: 6px 14px; font-size: 13px; font-weight: 500; text-decoration: none;
+            color: var(--muted); border-radius: 8px; transition: all 120ms;
+            display: inline-flex; align-items: center; gap: 3px; }
+  .nav a:hover  { color: var(--fg); }
+  .nav a.active { color: var(--fg); background: var(--surface-2); }
+  .nav-badge { display: inline-flex; align-items: center; justify-content: center;
+               min-width: 16px; height: 16px; border-radius: 8px; background: var(--brand);
+               color: white; font-size: 10px; font-weight: 700; padding: 0 3px; margin-left: 3px; }
+  .spacer { flex: 1; }
+
+  /* radial.css handles Radial Command Palette (V1.5) */
+</style>
+{% block head %}{% endblock %}
+<link rel="stylesheet" href="/static/radial.css">
+</head>
+<body>
+{% block body %}{% endblock %}
+
+<script>
+// Global: mark row as selected on click
+document.addEventListener('click', function(e) {
+  const row = e.target.closest('.row');
+  if (row) {
+    document.querySelectorAll('.row.selected').forEach(r => r.classList.remove('selected'));
+    row.classList.add('selected');
+  }
+});
+// Quick capture: submit on Enter
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && e.target.id === 'capture-input') {
+    e.target.closest('form').requestSubmit();
+    e.target.value = '';
+  }
+});
+// Nav badges: load counts on every page
+document.addEventListener('DOMContentLoaded', function() {
+  fetch('/api/inbox/count').then(r => r.json()).then(d => {
+    document.querySelectorAll('.inbox-nav-badge').forEach(el => {
+      if (d.count > 0) { el.textContent = d.count; el.style.display = 'inline-flex'; }
+    });
+  }).catch(() => {});
+  fetch('/api/items/orphans/count').then(r => r.json()).then(d => {
+    document.querySelectorAll('.orphans-nav-badge').forEach(el => {
+      if (d.count > 0) { el.textContent = d.count; el.style.display = 'inline-flex'; }
+    });
+  }).catch(() => {});
+});
+
+/* ── Browser Notifications (30-min lookahead, polls every 60s) ── */
+(function() {
+  const shown = new Set(JSON.parse(sessionStorage.getItem('mc_notif_shown') || '[]'));
+  const saveShown = () => sessionStorage.setItem('mc_notif_shown', JSON.stringify([...shown]));
+
+  async function requestPerm() {
+    if (!('Notification' in window)) return false;
+    if (Notification.permission === 'granted') return true;
+    if (Notification.permission === 'denied') return false;
+    const p = await Notification.requestPermission();
+    return p === 'granted';
+  }
+
+  async function checkDue() {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    try {
+      const r = await fetch('/api/notifications/due');
+      const items = await r.json();
+      for (const item of items) {
+        if (shown.has(item.id)) continue;
+        shown.add(item.id);
+        saveShown();
+        const when = item.notify_at ? item.notify_at.slice(11, 16) : '';
+        const body = [
+          item.project_title ? `📂 ${item.project_title}` : null,
+          when ? `🕐 ${when}` : null,
+        ].filter(Boolean).join('  ');
+        const n = new Notification(`☐ ${item.title}`, {
+          body: body || '일정이 곧 시작됩니다',
+          icon: '/favicon.ico',
+          tag: `mc-item-${item.id}`,
+        });
+        n.onclick = () => { window.focus(); n.close(); };
+        /* server-side mark (best-effort) */
+        const fd = new FormData(); fd.append('item_id', item.id);
+        fetch('/api/notifications/mark-sent', {method: 'POST', body: fd}).catch(() => {});
+      }
+    } catch (_) {}
+  }
+
+  /* Request permission on first user gesture or after a short delay */
+  let permRequested = false;
+  function maybeRequest() {
+    if (permRequested) return;
+    permRequested = true;
+    requestPerm().then(ok => { if (ok) { checkDue(); setInterval(checkDue, 60_000); } });
+  }
+  document.addEventListener('click', maybeRequest, { once: true });
+  /* Also try passively after 5s (if already granted) */
+  setTimeout(() => {
+    if (Notification.permission === 'granted') {
+      checkDue();
+      setInterval(checkDue, 60_000);
+    }
+  }, 5000);
+})();
+</script>
+
+{% include "partials/radial_palette.html" %}
+<script src="/static/radial.js" defer></script>
+</body>
+</html>

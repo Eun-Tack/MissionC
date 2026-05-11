@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>SC-16 Memo Editor · MC</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css">
+<style>
+  :root {
+    --bg: oklch(99% 0.005 270); --fg: oklch(20% 0.02 270);
+    --muted: oklch(55% 0.015 270); --border: oklch(92% 0.01 270);
+    --surface: oklch(98% 0.005 270); --surface-2: oklch(96% 0.008 270);
+    --brand: oklch(58% 0.18 280); --brand-soft: oklch(95% 0.04 280);
+    --accent: oklch(70% 0.15 200);
+    --st-doing: oklch(60% 0.18 240); --st-done: oklch(60% 0.16 145);
+    --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: oklch(15% 0.01 270); --fg: oklch(94% 0.005 270);
+      --muted: oklch(65% 0.015 270); --border: oklch(28% 0.015 270);
+      --surface: oklch(20% 0.01 270); --surface-2: oklch(24% 0.012 270);
+      --brand-soft: oklch(28% 0.06 280);
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; font-family: 'Pretendard Variable', system-ui, sans-serif;
+               background: var(--bg); color: var(--fg); }
+
+  .app { display: grid; grid-template-rows: 56px 1fr 32px;
+         grid-template-columns: 240px 1fr 280px; height: 100vh;
+         grid-template-areas: "topbar topbar topbar" "tree editor outline" "lifecycle lifecycle lifecycle"; }
+
+  /* Topbar */
+  .topbar { grid-area: topbar; border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; padding: 0 20px; gap: 16px; }
+  .logo { font-weight: 800; font-size: 18px; color: var(--brand); }
+  .breadcrumb { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 4px; }
+  .breadcrumb span:last-child { color: var(--fg); font-weight: 500; }
+  .breadcrumb a { cursor: pointer; }
+  .breadcrumb a:hover { color: var(--fg); }
+  .topbar .spacer { flex: 1; }
+  .save-indicator { display: inline-flex; align-items: center; gap: 6px;
+                    font-size: 12px; color: var(--muted); }
+  .save-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--st-done); }
+  .topbar-btn { padding: 6px 12px; font-size: 12px; border-radius: 6px;
+                border: 1px solid var(--border); background: var(--surface); cursor: pointer; }
+  .topbar-btn:hover { background: var(--surface-2); }
+
+  /* === TREE (left) === */
+  .tree { grid-area: tree; border-right: 1px solid var(--border);
+          background: var(--surface); padding: 16px 8px; overflow-y: auto; }
+  .tree-search { width: 100%; padding: 6px 10px 6px 28px; font-size: 12px;
+                 border: 1px solid var(--border); border-radius: 6px; background: var(--bg);
+                 background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
+                 background-repeat: no-repeat; background-position: 8px center; background-size: 12px;
+                 margin-bottom: 12px; }
+  .tree-h { font-size: 10px; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 0.05em; color: var(--muted); padding: 0 8px; margin: 12px 0 4px; }
+  .tree-item { display: flex; align-items: center; gap: 4px; padding: 4px 8px;
+               font-size: 12px; border-radius: 4px; cursor: pointer;
+               transition: background 120ms; line-height: 1.4; }
+  .tree-item:hover { background: var(--surface-2); }
+  .tree-item.active { background: var(--brand-soft); color: var(--brand); font-weight: 500; }
+  .tree-item.depth-1 { padding-left: 18px; }
+  .tree-item.depth-2 { padding-left: 28px; }
+  .tree-item.depth-3 { padding-left: 38px; }
+
+  /* === EDITOR (center) === */
+  .editor { grid-area: editor; overflow-y: auto; padding: 40px 80px; position: relative; }
+  .editor-canvas { max-width: 720px; margin: 0 auto; }
+  .doc-title { font-size: 36px; font-weight: 800; letter-spacing: -0.02em;
+               border: none; outline: none; width: 100%; background: transparent;
+               color: var(--fg); margin-bottom: 4px; font-family: inherit; }
+  .doc-title::placeholder { color: var(--muted); }
+  .doc-meta { font-size: 12px; color: var(--muted); margin-bottom: 24px;
+              display: flex; gap: 12px; align-items: center; }
+  .doc-meta .pill { display: inline-flex; align-items: center; gap: 4px;
+                    padding: 2px 8px; background: var(--surface-2); border-radius: 999px; }
+
+  /* Block */
+  .block { padding: 4px 0; position: relative; transition: background 120ms; }
+  .block:hover { }
+  .block-handle {
+    position: absolute; left: -32px; top: 8px;
+    width: 20px; height: 20px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--muted); cursor: grab;
+    opacity: 0; transition: opacity 120ms;
+    border-radius: 4px;
+  }
+  .block-handle:hover { background: var(--surface-2); color: var(--fg); }
+  .block:hover .block-handle { opacity: 1; }
+  .add-block {
+    position: absolute; left: -56px; top: 8px;
+    width: 20px; height: 20px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--muted); cursor: pointer;
+    opacity: 0; transition: opacity 120ms;
+    border-radius: 4px; font-size: 16px;
+  }
+  .add-block:hover { background: var(--surface-2); color: var(--brand); }
+  .block:hover .add-block { opacity: 1; }
+
+  .block h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.3; }
+  .block h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.3;
+              margin-top: 12px; }
+  .block h3 { font-size: 18px; font-weight: 600; line-height: 1.4; margin-top: 8px; }
+  .block p  { font-size: 15px; line-height: 1.7; color: var(--fg); }
+  .block ul, .block ol { padding-left: 28px; font-size: 15px; line-height: 1.7; }
+  .block li { margin-bottom: 4px; }
+
+  /* Checkbox block */
+  .check-block { display: flex; align-items: start; gap: 10px; padding: 4px 0; }
+  .check-box {
+    width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid var(--border);
+    flex-shrink: 0; margin-top: 4px;
+    cursor: pointer; transition: all 120ms;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; color: white;
+  }
+  .check-box:hover { border-color: var(--brand); }
+  .check-box[data-checked="true"] {
+    background: var(--st-done); border-color: var(--st-done);
+  }
+  .check-text.done { text-decoration: line-through; color: var(--muted); }
+
+  /* Code block */
+  .code-block {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 16px; margin: 8px 0;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 13px; line-height: 1.6;
+    color: oklch(45% 0.05 270); position: relative;
+  }
+  .code-block::before {
+    content: 'sql'; position: absolute; top: 6px; right: 12px;
+    font-size: 10px; color: var(--muted); text-transform: uppercase;
+  }
+
+  /* Quote block */
+  .quote-block {
+    border-left: 3px solid var(--brand); padding: 4px 0 4px 16px;
+    color: var(--muted); font-style: italic; font-size: 15px; line-height: 1.7;
+  }
+
+  /* Inline mention */
+  .mention {
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 1px 6px; background: var(--brand-soft); color: var(--brand);
+    border-radius: 4px; font-weight: 500; font-size: 14px; cursor: pointer;
+  }
+
+  /* Slash command palette (overlay demo) */
+  .slash-palette {
+    position: absolute; left: 80px; top: 320px;
+    width: 280px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 16px 48px oklch(0% 0 0 / 0.12);
+    padding: 8px;
+    z-index: 10;
+    animation: slash-in 240ms var(--ease);
+  }
+  @keyframes slash-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+  .slash-h { padding: 8px 10px 4px; font-size: 10px; font-weight: 600;
+             text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+  .slash-item { display: flex; align-items: center; gap: 12px;
+                padding: 8px 10px; border-radius: 6px; cursor: pointer;
+                transition: background 80ms; }
+  .slash-item:hover, .slash-item.active { background: var(--surface-2); }
+  .slash-icon { width: 32px; height: 32px; border-radius: 6px;
+                background: var(--surface-2);
+                display: flex; align-items: center; justify-content: center;
+                font-size: 16px; flex-shrink: 0; }
+  .slash-info { flex: 1; }
+  .slash-name { font-size: 13px; font-weight: 500; }
+  .slash-desc { font-size: 11px; color: var(--muted); }
+  .slash-key { font-family: 'JetBrains Mono', monospace; font-size: 10px;
+               color: var(--muted); padding: 2px 6px; background: var(--surface-2);
+               border-radius: 4px; }
+
+  /* Mention popup */
+  .mention-pop {
+    position: absolute; top: 470px; left: 200px;
+    width: 240px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 12px 36px oklch(0% 0 0 / 0.1);
+    padding: 6px;
+    z-index: 10;
+    animation: slash-in 240ms var(--ease);
+  }
+  .mention-tabs { display: flex; gap: 4px; padding: 4px; border-bottom: 1px solid var(--border); }
+  .mention-tab { font-size: 10px; padding: 3px 8px; border-radius: 4px;
+                 cursor: pointer; color: var(--muted); }
+  .mention-tab.active { background: var(--brand-soft); color: var(--brand); font-weight: 500; }
+  .mention-list { padding: 4px; }
+  .mention-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px;
+                 border-radius: 6px; cursor: pointer; font-size: 12px; }
+  .mention-row:hover { background: var(--surface-2); }
+  .mention-row .ico { color: var(--muted); }
+
+  /* === OUTLINE (right) === */
+  .outline { grid-area: outline; border-left: 1px solid var(--border);
+             background: var(--surface); padding: 16px 12px; overflow-y: auto; }
+  .outline-h { font-size: 10px; font-weight: 600; text-transform: uppercase;
+               letter-spacing: 0.05em; color: var(--muted); margin-bottom: 8px; }
+  .outline-item { padding: 4px 8px; font-size: 12px; cursor: pointer;
+                  border-left: 2px solid transparent;
+                  transition: all 120ms; line-height: 1.5; }
+  .outline-item:hover { background: var(--surface-2); }
+  .outline-item.active { color: var(--brand); border-left-color: var(--brand); }
+  .outline-item.h2 { font-weight: 600; }
+  .outline-item.h3 { padding-left: 20px; color: var(--muted); }
+  .outline-item.h3.active { color: var(--brand); }
+
+  /* Connections section */
+  .conn-h { font-size: 10px; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 0.05em; color: var(--muted); margin: 24px 0 8px; padding: 0 8px; }
+  .conn-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px;
+              border-radius: 6px; font-size: 12px; cursor: pointer; }
+  .conn-row:hover { background: var(--surface-2); }
+  .conn-row .ico { color: var(--muted); flex-shrink: 0; }
+
+  /* === LIFECYCLE BAR (bottom) === */
+  .lifecycle { grid-area: lifecycle; border-top: 1px solid var(--border);
+               background: var(--surface); display: flex; align-items: center;
+               padding: 0 20px; gap: 12px; font-size: 11px; color: var(--muted); }
+  .lifecycle-track { flex: 1; height: 16px; position: relative;
+                     display: flex; align-items: center; }
+  .lifecycle-line {
+    position: absolute; left: 0; right: 0; height: 1px; background: var(--border);
+  }
+  .evo-pip {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--brand); cursor: pointer;
+    position: absolute; transition: all 120ms;
+    box-shadow: 0 0 0 3px oklch(70% 0.18 280 / 0.15);
+  }
+  .evo-pip:hover { transform: scale(1.4); }
+  .evo-pip.live { animation: live-pulse 2.4s ease-in-out infinite; }
+  @keyframes live-pulse {
+    0%, 100% { box-shadow: 0 0 0 3px oklch(70% 0.18 280 / 0.15); }
+    50%      { box-shadow: 0 0 0 7px oklch(70% 0.18 280 / 0); }
+  }
+  .lifecycle-meta { font-family: 'JetBrains Mono', monospace; font-size: 10px; }
+
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <span class="logo">MC</span>
+    <div class="breadcrumb">
+      <a>플링크데이터</a><span>›</span>
+      <a>플링크케어 사업</a><span>›</span>
+      <a>MC 개발</a><span>›</span>
+      <a>02_개발</a><span>›</span>
+      <span>아키텍처 결정 노트.md</span>
+    </div>
+    <div class="spacer"></div>
+    <span class="save-indicator">
+      <span class="save-dot"></span>
+      저장됨 · 0.3초 전
+    </span>
+    <button class="topbar-btn">📎 파일 추가</button>
+    <button class="topbar-btn">🔗 항목 연결</button>
+    <button class="topbar-btn">···</button>
+  </div>
+
+  <!-- TREE -->
+  <div class="tree">
+    <input class="tree-search" placeholder="파일 검색 또는 의미 검색" />
+
+    <div class="tree-h">📁 폴더</div>
+    <div class="tree-item">📂 플링크데이터</div>
+    <div class="tree-item depth-1">🗂 플링크케어 사업</div>
+    <div class="tree-item depth-2">📂 MC 개발</div>
+    <div class="tree-item depth-3">✓ 01_기획 (8)</div>
+    <div class="tree-item depth-3" style="color: var(--st-doing); font-weight: 600;">● 02_개발 (10)</div>
+    <div class="tree-item depth-3" style="padding-left: 50px;">📝 스펙.md</div>
+    <div class="tree-item depth-3 active" style="padding-left: 50px;">📝 아키텍처 결정 노트.md</div>
+    <div class="tree-item depth-3" style="padding-left: 50px;">📝 NPU-벤치마크.md</div>
+    <div class="tree-item depth-3" style="padding-left: 50px;">📊 통계.ipynb</div>
+    <div class="tree-item depth-3">○ 03_검토 (4)</div>
+    <div class="tree-item depth-3">○ 04_배포 (0)</div>
+    <div class="tree-item depth-2">📂 API 연동</div>
+    <div class="tree-item depth-1">🗂 ODC 개발 사업</div>
+
+    <div class="tree-h" style="margin-top: 20px;">🕒 최근</div>
+    <div class="tree-item">📝 미팅 안건.md</div>
+    <div class="tree-item">📝 V1.1 아이디어.md</div>
+    <div class="tree-item">📝 회고-2026-05-05.md</div>
+
+    <div class="tree-h" style="margin-top: 20px;">📥 inbox</div>
+    <div class="tree-item">📝 2026/05/06.md</div>
+    <div class="tree-item" style="color: var(--muted);">📁 (12개 미정리)</div>
+  </div>
+
+  <!-- EDITOR -->
+  <div class="editor">
+    <div class="editor-canvas">
+      <input class="doc-title" value="아키텍처 결정 노트" />
+      <div class="doc-meta">
+        <span class="pill">📁 02_개발</span>
+        <span class="pill">#mc-dev</span>
+        <span class="pill">evo 5</span>
+        <span style="margin-left: auto; font-family: 'JetBrains Mono', monospace;">9일 누적 · 142 → 818자</span>
+      </div>
+
+      <div class="block">
+        <span class="add-block" title="블록 추가">+</span>
+        <span class="block-handle" title="끌어서 이동">⋮⋮</span>
+        <p>NPU 추론 EP 결정 — Intel Core Ultra 7의 NPU(AI Boost)를 활용하기 위해
+        OpenVINO + Optimum-Intel을 채택했다. <span class="mention">@미팅 안건.md</span> 회의에서 합의됨.</p>
+      </div>
+
+      <div class="block">
+        <span class="add-block">+</span>
+        <span class="block-handle">⋮⋮</span>
+        <h2>1. 모델 후보 비교</h2>
+      </div>
+
+      <div class="block">
+        <span class="add-block">+</span>
+        <span class="block-handle">⋮⋮</span>
+        <p>임베딩 모델 결정이 필요하다. 한국어 회상률·차원·NPU 호환성을 종합 검토.</p>
+      </div>
+
+      <div class="block">
+        <span class="add-block">+</span>
+        <span class="block-handle">⋮⋮</span>
+        <ul>
+          <li><strong>KoE5 (384d)</strong> — 한국어 특화, NPU INT8 지원</li>
+          <li><strong>bge-m3 (1024d)</strong> — 다국어, 표현력 우수, NPU 미검증</li>
+        </ul>
+      </div>
+
+      <div class="block">
+        <span class="add-block">+</span>
+        <span class="block-handle">⋮⋮</span>
+        <h2>2. 의사결정</h2>
+      </div>
+
+      <div class="check-block block">
+        <span class="add-block">+</span>
+        <span class="block-handle">⋮⋮</span>
+        <span class="check-box" data-checked="true">✓</span>
+        <span class="check-text done">KoE5로 V1.0 시작 (sim 0.85 임계값)</span>
+      </div>
+      <div class="check-block block">
+        <span class="add-block">+</span>
+        <span class="block-handle">⋮⋮</span>
+        <span class="check-box"></span>
+        <span class="check-text">V1.1에서 bge-m3 A/B 테스트 (50개 메모 기준)</span>
+      </div>
+      <div class="check-block block">
+        <span class="add-block">+</span>
+        <span class="block-handle">⋮⋮</span>
+        <span class="check-box"></span>
+        <span class="check-text">결정 후 마이그레이션 계획 (재인덱싱 1024d)</span>
+      </div>
+
+      <div class="block">
+        <span class="add-block">+</span>
+        <span class="block-handle">⋮⋮</span>
+        <h2>3. 참고 자료</h2>
+      </div>
+
+      <div class="block">
+        <span class="add-block">+</span>
+        <span class="block-handle">⋮⋮</span>
+        <div class="quote-block">
+          "OpenVINO NPU EP는 ONNX의 INT8 정량화 모델만 가속한다.
+          FP16/FP32는 CPU fallback." — Intel 문서
+        </div>
+      </div>
+
+      <div class="block">
+        <span class="add-block">+</span>
+        <span class="block-handle">⋮⋮</span>
+        <p>관련 PR — <span class="mention">@#42</span>. 보훈진흥원 Q2 리뷰에도 영향.</p>
+      </div>
+
+      <div class="block">
+        <span class="add-block">+</span>
+        <span class="block-handle">⋮⋮</span>
+        <p style="color: var(--muted); font-style: italic;">/</p>
+      </div>
+
+      <!-- Slash command palette demo -->
+      <div class="slash-palette">
+        <div class="slash-h">블록 추가 — `/` 입력 후</div>
+        <div class="slash-item active">
+          <div class="slash-icon">H</div>
+          <div class="slash-info"><div class="slash-name">Heading 2</div><div class="slash-desc">섹션 제목</div></div>
+          <span class="slash-key">/h2</span>
+        </div>
+        <div class="slash-item">
+          <div class="slash-icon">☐</div>
+          <div class="slash-info"><div class="slash-name">체크박스</div><div class="slash-desc">완료 가능 항목 (메모 → task 변환)</div></div>
+          <span class="slash-key">/todo</span>
+        </div>
+        <div class="slash-item">
+          <div class="slash-icon">&lt;&gt;</div>
+          <div class="slash-info"><div class="slash-name">코드 블록</div><div class="slash-desc">syntax highlight</div></div>
+          <span class="slash-key">/code</span>
+        </div>
+        <div class="slash-item">
+          <div class="slash-icon">"</div>
+          <div class="slash-info"><div class="slash-name">인용</div><div class="slash-desc">출처 표시</div></div>
+          <span class="slash-key">/quote</span>
+        </div>
+        <div class="slash-item">
+          <div class="slash-icon">@</div>
+          <div class="slash-info"><div class="slash-name">멘션</div><div class="slash-desc">메모·항목·이슈 연결</div></div>
+          <span class="slash-key">@</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- OUTLINE -->
+  <div class="outline">
+    <div class="outline-h">목차</div>
+    <div class="outline-item h2 active">1. 모델 후보 비교</div>
+    <div class="outline-item h2">2. 의사결정</div>
+    <div class="outline-item h2">3. 참고 자료</div>
+
+    <div class="conn-h">📎 연결된 파일 · 항목</div>
+    <div class="conn-row">
+      <span class="ico">📝</span>
+      <span style="flex: 1;">미팅 안건.md</span>
+    </div>
+    <div class="conn-row">
+      <span class="ico">📝</span>
+      <span style="flex: 1;">NPU-벤치마크.md</span>
+    </div>
+    <div class="conn-row">
+      <span class="ico">🐙</span>
+      <span style="flex: 1;">issue #42</span>
+      <span style="font-size: 10px; padding: 1px 4px; background: oklch(94% 0.06 145); color: oklch(40% 0.16 145); border-radius: 3px;">open</span>
+    </div>
+    <div class="conn-row">
+      <span class="ico">★</span>
+      <span style="flex: 1;">설계 리뷰 (5/6 15:30)</span>
+    </div>
+    <div class="conn-row" style="color: var(--muted); border: 1px dashed var(--border); border-radius: 6px; cursor: pointer; justify-content: center;">
+      + 연결 추가
+    </div>
+
+    <div class="conn-h">🏷 라벨 · 태그</div>
+    <div style="display: flex; flex-wrap: wrap; gap: 4px; padding: 0 8px;">
+      <span style="font-size: 10px; padding: 2px 8px; background: oklch(94% 0.05 240); color: oklch(35% 0.18 240); border-radius: 999px;">검토중</span>
+      <span style="font-size: 10px; padding: 2px 8px; background: var(--surface-2); color: var(--muted); border-radius: 999px;">#mc-dev</span>
+      <span style="font-size: 10px; padding: 2px 8px; background: var(--surface-2); color: var(--muted); border-radius: 999px;">#아키텍처</span>
+      <span style="font-size: 10px; padding: 2px 8px; background: var(--surface-2); color: var(--muted); border-radius: 999px;">#NPU</span>
+    </div>
+
+    <div class="conn-h">🤖 AI 제안</div>
+    <div style="font-size: 11px; padding: 8px; background: var(--brand-soft); border-radius: 6px; color: var(--brand);">
+      💡 "<strong>NPU연구</strong>"는 기존 "<strong>NPU</strong>" 태그와 sim 0.92 — 머지하시겠어요?
+    </div>
+  </div>
+
+  <!-- LIFECYCLE BAR -->
+  <div class="lifecycle">
+    <span style="font-weight: 600;">📜</span>
+    <span>5번 진화 ·</span>
+    <div class="lifecycle-track">
+      <div class="lifecycle-line"></div>
+      <div class="evo-pip"      style="left: 0%;"   title="04-28 09:14 · 첫 작성 142자"></div>
+      <div class="evo-pip"      style="left: 22%;"  title="04-30 14:22 · +89자"></div>
+      <div class="evo-pip"      style="left: 40%;"  title="05-02 11:08 · 구조 변경"></div>
+      <div class="evo-pip"      style="left: 60%;"  title="05-04 16:55 · +312자"></div>
+      <div class="evo-pip live"  style="left: 100%;" title="05-06 10:42 · 최신 +45자"></div>
+    </div>
+    <span class="lifecycle-meta">9d · 142→818자 · sha 7e2d8a</span>
+  </div>
+
+</div>
+
+</body>
+</html>

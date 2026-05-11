@@ -1,0 +1,2 @@
+[SKIP]  DB already at version 8, no changes needed.
+[OK]    settings rows: 24

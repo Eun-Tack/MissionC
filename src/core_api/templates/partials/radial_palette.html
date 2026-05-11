@@ -1,0 +1,36 @@
+{# Radial Command Palette V1.5 — FR-RADIAL-01~05 / ADR-011 #}
+{# Loaded once in base.html. Hidden by default. All interaction via radial.js #}
+<div id="radial-root" class="radial" role="menu" aria-label="명령 팔레트" hidden>
+  <div class="radial-overlay" aria-hidden="true"></div>
+
+  <div class="radial-wheel" role="presentation">
+    <svg id="radial-svg" viewBox="0 0 480 480" class="radial-svg" aria-hidden="true">
+      {# 8 slice paths built by JS (_buildSlices) #}
+    </svg>
+    <div id="radial-labels" class="radial-labels" aria-hidden="true">
+      {# 8 label nodes built by JS #}
+    </div>
+    <div class="radial-hub" id="radial-hub">
+      <span class="hub-label" id="hub-label">Cmd+K</span>
+      <div class="hub-form" id="hub-form" hidden>
+        <input class="hub-input" id="hub-input" type="text"
+               autocomplete="off" spellcheck="false" aria-label="입력">
+      </div>
+    </div>
+  </div>
+
+  <div class="radial-search-panel" id="radial-search-panel" hidden aria-live="polite">
+    {# Search results injected by JS #}
+  </div>
+
+  <div class="radial-hint" aria-hidden="true">
+    <span><kbd>↑↓←→</kbd> 탐색</span>
+    <span><kbd>Enter</kbd> 실행</span>
+    <span><kbd>Esc</kbd> 닫기</span>
+  </div>
+</div>
+
+{# FAB — fixed bottom-right on all pages #}
+<button class="radial-fab" id="radial-fab"
+        aria-label="명령 팔레트 열기 (Cmd+K)"
+        onclick="window.radialPalette?.toggle()">⊙</button>

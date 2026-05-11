@@ -1,0 +1,89 @@
+{#
+  Flow list partial — rendered inside #flow-content.
+  Used by: GET /partial/flow (htmx swap + auto-refresh every 60s)
+  Context vars: sections (dict), section_labels (dict)
+#}
+
+{% for section_key, section_label in section_labels.items() %}
+  {% set section_items = sections[section_key] %}
+  {% if section_items %}
+  <div class="sec-h">{{ section_label }}</div>
+  <div class="timeline" id="{{ section_key }}-list">
+    {% for item in section_items %}
+    <div class="row {% if item.status == 'doing' %}selected{% endif %}"
+         id="item-{{ item.id }}"
+         hx-get="/partial/context/{{ item.id }}"
+         hx-target="#context-panel"
+         hx-swap="innerHTML">
+
+      <span class="time">{{ item.time_display }}</span>
+      <span class="dot-wrap">
+        <span class="mc-dot" id="dot-{{ item.id }}" data-status="{{ item.status }}"></span>
+      </span>
+      <span class="icon">
+        {%- if item.type == 'memo' -%}📝
+        {%- elif item.type == 'schedule' -%}★
+        {%- else -%}☐
+        {%- endif -%}
+      </span>
+      <div class="body">
+        <div class="title {% if item.status == 'done' %}done{% endif %}"
+             style="display: flex; align-items: center; gap: 6px;">
+          {{ item.title }}
+          {% if item.evolution_count >= 3 %}
+          <span class="lifecycle-mark" title="{{ item.evolution_count }}번 진화 — Memo Lifecycle"></span>
+          {% endif %}
+        </div>
+        <div class="meta-line">
+          {# GCal badge #}
+          {% if item.gcal_title %}
+          <span class="gcal-badge">🗓 GCal</span>
+          {% endif %}
+          {# Labels #}
+          {% for label in item.labels %}
+          <span class="label" data-type="{{ label.name }}">{{ label.name }}</span>
+          {% endfor %}
+          {# Tags #}
+          {% for tag in item.tags %}
+          <span class="tag-chip">#{{ tag }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      {# Inline status toggle #}
+      <div style="display:flex; gap:2px; opacity:0; transition: opacity 120ms;" class="row-actions">
+        {% if item.status != 'done' %}
+        <button class="status-btn"
+                hx-patch="/api/items/{{ item.id }}"
+                hx-vals='{"status": "done"}'
+                hx-target="#dot-{{ item.id }}"
+                hx-swap="outerHTML"
+                title="완료">✓</button>
+        {% endif %}
+        {% if item.status == 'todo' %}
+        <button class="status-btn"
+                hx-patch="/api/items/{{ item.id }}"
+                hx-vals='{"status": "doing"}'
+                hx-target="#dot-{{ item.id }}"
+                hx-swap="outerHTML"
+                title="진행중">▶</button>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+{% endfor %}
+
+{% if not (sections.morning or sections.afternoon or sections.evening or sections.anytime) %}
+<div style="text-align: center; padding: 60px 0; color: var(--muted);">
+  <div style="font-size: 32px; margin-bottom: 12px;">✦</div>
+  <div style="font-size: 14px;">오늘 할 일이 없습니다</div>
+  <div style="font-size: 12px; margin-top: 8px; color: var(--muted);">
+    아래 빠른 캡처에서 항목을 추가하세요
+  </div>
+</div>
+{% endif %}
+
+<style>
+.row:hover .row-actions { opacity: 1 !important; }
+</style>

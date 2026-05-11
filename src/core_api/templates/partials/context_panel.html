@@ -1,0 +1,838 @@
+{#
+  Context Panel — fully editable inline surface (no modal).
+  Loaded via GET /partial/context/{id}. Click any field to edit.
+  Context vars: item, project, tags, labels, memos, github_issues,
+                all_projects, all_labels
+#}
+<style>
+  /* ── Panel scaffolding ───────────────────────────────────────────── */
+  .ctx-h         { padding: 18px 20px 14px; border-bottom: 1px solid var(--border);
+                   position: relative; }
+  .ctx-type      { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+                   color: var(--muted); margin-bottom: 8px; display: flex;
+                   align-items: center; gap: 8px; font-weight: 600; }
+  .ctx-status    { display: inline-flex; align-items: center; gap: 5px;
+                   padding: 2px 8px; border-radius: 999px; font-size: 10px;
+                   text-transform: none; letter-spacing: 0; }
+  .ctx-status.todo        { background: var(--surface-2); color: var(--muted); }
+  .ctx-status.doing,
+  .ctx-status.in_progress { background: oklch(94% 0.06 240); color: oklch(40% 0.18 240); }
+  .ctx-status.done        { background: oklch(94% 0.06 145); color: oklch(35% 0.16 145); }
+  .ctx-status.waiting     { background: oklch(96% 0.07 80);  color: oklch(40% 0.16 80); }
+
+  /* Editable title — click to edit */
+  .ctx-title-wrap { position: relative; }
+  .ctx-title     { font-size: 17px; font-weight: 600; line-height: 1.35;
+                   padding: 4px 6px; margin: -4px -6px; border-radius: 6px;
+                   cursor: text; transition: background 120ms; }
+  .ctx-title:hover { background: var(--surface-2); }
+  .ctx-title-input {
+    width: 100%; font-size: 17px; font-weight: 600; line-height: 1.35;
+    padding: 4px 6px; margin: -4px -6px; border-radius: 6px;
+    border: 1px solid var(--brand); background: var(--bg); color: var(--fg);
+    font-family: inherit;
+  }
+  .ctx-title-input:focus { outline: none; box-shadow: 0 0 0 3px var(--brand-soft); }
+
+  .ctx-section   { padding: 14px 20px; border-bottom: 1px solid var(--border); }
+  .ctx-section:last-of-type { border-bottom: 0; }
+  .ctx-section-h { font-size: 10px; font-weight: 600; text-transform: uppercase;
+                   letter-spacing: 0.06em; color: var(--muted); margin-bottom: 10px;
+                   display: flex; align-items: center; gap: 6px; }
+
+  /* ── Inline date/time picker ────────────────────────────────────── */
+  .ctx-date-row  { display: flex; align-items: center; gap: 8px; }
+  .ctx-date-input {
+    flex: 1; padding: 6px 10px; border: 1px solid var(--border);
+    border-radius: 7px; background: var(--surface); color: var(--fg);
+    font-size: 13px; font-family: 'JetBrains Mono', monospace;
+  }
+  .ctx-date-input:focus { outline: none; border-color: var(--brand); }
+  .ctx-quick-row { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
+  .ctx-quick-btn {
+    padding: 3px 9px; font-size: 11px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--muted); border-radius: 999px;
+    cursor: pointer; transition: all 100ms;
+  }
+  .ctx-quick-btn:hover { background: var(--brand-soft); color: var(--brand); border-color: var(--brand); }
+
+  /* ── Project selector — radial reveal ────────────────────────────── */
+  .ctx-proj-current {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+    background: var(--surface-2); border-radius: 10px; cursor: pointer;
+    border: 1px solid transparent; transition: all 120ms;
+  }
+  .ctx-proj-current:hover { border-color: var(--brand); }
+  .ctx-proj-empty {
+    padding: 10px 12px; border: 1px dashed var(--border); border-radius: 10px;
+    color: var(--muted); font-size: 12px; cursor: pointer; text-align: center;
+    transition: all 120ms;
+  }
+  .ctx-proj-empty:hover { border-color: var(--brand); color: var(--brand); }
+  .ctx-proj-pick {
+    margin-top: 6px; max-height: 0; overflow: hidden;
+    transition: max-height 200ms var(--ease);
+  }
+  .ctx-proj-pick.open { max-height: 280px; overflow-y: auto; }
+  .ctx-proj-pick select {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--brand);
+    border-radius: 8px; background: var(--bg); color: var(--fg);
+    font-size: 13px; font-family: inherit;
+  }
+
+  /* ── Body editor ──────────────────────────────────────────────── */
+  .ctx-body-text {
+    padding: 8px 12px; background: var(--surface-2); border-radius: 8px;
+    font-size: 13px; line-height: 1.55; color: var(--fg); cursor: text;
+    min-height: 38px; white-space: pre-wrap; transition: background 120ms;
+  }
+  .ctx-body-text:hover { background: var(--surface); border: 1px solid var(--border); padding: 7px 11px; }
+  .ctx-body-text:empty::before {
+    content: '본문 추가...'; color: var(--muted); font-style: italic;
+  }
+  .ctx-body-textarea {
+    width: 100%; padding: 8px 12px; border: 1px solid var(--brand);
+    border-radius: 8px; background: var(--bg); color: var(--fg);
+    font-size: 13px; line-height: 1.55; font-family: inherit; resize: vertical;
+    min-height: 80px;
+  }
+
+  /* ── Label/tag pills ─────────────────────────────────────────── */
+  .ctx-pills { display: flex; flex-wrap: wrap; gap: 4px; }
+  .ctx-pill {
+    font-size: 11px; padding: 3px 9px; border-radius: 999px;
+    background: var(--surface-2); color: var(--fg);
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .ctx-pill .x { cursor: pointer; opacity: 0.5; font-size: 10px; }
+  .ctx-pill .x:hover { opacity: 1; color: oklch(60% 0.21 25); }
+  .ctx-add-row { display: flex; gap: 4px; margin-top: 8px; }
+  .ctx-add-row input, .ctx-add-row select {
+    flex: 1; padding: 5px 9px; border: 1px solid var(--border);
+    border-radius: 6px; font-size: 12px; background: var(--surface); color: var(--fg);
+  }
+  .ctx-add-row button {
+    padding: 5px 10px; background: var(--brand-soft); color: var(--brand);
+    border: none; border-radius: 6px; font-size: 11px; cursor: pointer; font-weight: 500;
+  }
+
+  /* ── Status segmented control ───────────────────────────────── */
+  .ctx-status-seg {
+    display: flex; gap: 0; border: 1px solid var(--border);
+    border-radius: 8px; overflow: hidden;
+  }
+  .ctx-status-btn {
+    flex: 1; padding: 7px 4px; font-size: 11px; font-weight: 500;
+    background: transparent; border: none; color: var(--muted);
+    cursor: pointer; transition: all 120ms; border-right: 1px solid var(--border);
+  }
+  .ctx-status-btn:last-child { border-right: none; }
+  .ctx-status-btn:hover { background: var(--surface-2); color: var(--fg); }
+  .ctx-status-btn.active.todo    { background: var(--surface-2); color: var(--fg); }
+  .ctx-status-btn.active.doing   { background: oklch(94% 0.06 240); color: oklch(35% 0.18 240); }
+  .ctx-status-btn.active.done    { background: oklch(94% 0.06 145); color: oklch(35% 0.16 145); }
+  .ctx-status-btn.active.waiting { background: oklch(96% 0.07 80);  color: oklch(35% 0.16 80); }
+
+  /* ── Sub-tasks (hierarchical) ──────────────────────────────── */
+  .sub-progress-row {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 11px; margin-bottom: 6px;
+  }
+  .sub-progress-label { color: var(--muted); }
+  .sub-progress-pct { font-weight: 700; color: var(--brand); font-family: 'JetBrains Mono', monospace; }
+  .sub-progress-bar {
+    height: 4px; background: var(--surface-2); border-radius: 999px; overflow: hidden;
+    margin-bottom: 10px;
+  }
+  .sub-progress-fill {
+    height: 100%; background: linear-gradient(90deg, var(--brand), var(--accent));
+    border-radius: 999px; transition: width 400ms var(--ease);
+  }
+  .sub-list { display: flex; flex-direction: column; gap: 2px; }
+  .sub-item {
+    display: flex; align-items: center; gap: 8px; padding: 6px 8px;
+    border-radius: 6px; font-size: 12px; transition: background 80ms;
+  }
+  .sub-item:hover { background: var(--surface-2); }
+  .sub-item.sub-done .sub-title { text-decoration: line-through; color: var(--muted); }
+  .sub-check, .sub-x {
+    background: none; border: 1px solid var(--border); cursor: pointer;
+    border-radius: 50%; width: 18px; height: 18px; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; color: var(--muted);
+  }
+  .sub-check:hover { border-color: var(--brand); color: var(--brand); }
+  .sub-item.sub-done .sub-check { background: var(--st-done); color: white; border-color: var(--st-done); }
+  .sub-x { border: none; opacity: 0; }
+  .sub-item:hover .sub-x { opacity: 0.5; }
+  .sub-x:hover { opacity: 1 !important; color: oklch(60% 0.21 25); }
+  .sub-title { flex: 1; }
+  .sub-meta { font-size: 10px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+  .sub-add-row { display: flex; gap: 4px; margin-top: 8px; }
+  .sub-add-row input[type=text] {
+    flex: 1; padding: 5px 9px; border: 1px solid var(--border);
+    border-radius: 6px; font-size: 12px; background: var(--surface); color: var(--fg);
+  }
+  .sub-add-row input[type=date] {
+    width: 110px; padding: 5px 6px; border: 1px solid var(--border);
+    border-radius: 6px; font-size: 11px; background: var(--surface); color: var(--fg);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .sub-add-row button {
+    padding: 5px 10px; background: var(--brand-soft); color: var(--brand);
+    border: none; border-radius: 6px; font-size: 11px; cursor: pointer; font-weight: 500;
+  }
+
+  /* ── Recurrence picker ──────────────────────────────────── */
+  .ctx-recur-seg {
+    display: flex; gap: 0; border: 1px solid var(--border);
+    border-radius: 8px; overflow: hidden;
+  }
+  .ctx-recur-btn {
+    flex: 1; padding: 7px 2px; font-size: 10px; font-weight: 500;
+    background: transparent; border: none; color: var(--muted);
+    cursor: pointer; transition: all 120ms; border-right: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .ctx-recur-btn:last-child { border-right: none; }
+  .ctx-recur-btn:hover { background: var(--surface-2); color: var(--fg); }
+  .ctx-recur-btn.active { background: var(--brand-soft); color: var(--brand); font-weight: 700; }
+  .ctx-recur-badge {
+    display: inline-block; font-size: 10px; background: var(--brand-soft);
+    color: var(--brand); padding: 1px 7px; border-radius: 999px;
+    font-weight: 600; margin-left: 6px; vertical-align: middle;
+  }
+
+  /* Attendee pills ───────────────────────────────────────────── */
+  .attendee-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 8px 3px 4px; border-radius: 999px;
+    background: var(--surface-2); border: 1px solid var(--border);
+    font-size: 12px; margin: 2px 3px 2px 0;
+  }
+  .att-av {
+    width: 18px; height: 18px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 9px; font-weight: 700; color: white; flex-shrink: 0;
+  }
+  .att-x { cursor: pointer; color: var(--muted); font-size: 12px; margin-left: 2px; }
+  .att-x:hover { color: oklch(50% 0.2 20); }
+  .att-add { display: flex; gap: 6px; margin-top: 8px; position: relative; }
+  .att-add input {
+    flex: 1; padding: 5px 8px; font-size: 12px;
+    border: 1px solid var(--border); border-radius: 7px;
+    background: var(--surface); color: var(--fg); outline: none;
+  }
+  .att-add input:focus { border-color: var(--brand); }
+  .att-dropdown {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 20;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; box-shadow: 0 8px 24px oklch(0% 0 0 / 0.12);
+    max-height: 180px; overflow-y: auto; display: none;
+  }
+  .att-dropdown.open { display: block; }
+  .att-opt {
+    padding: 7px 10px; font-size: 12px; cursor: pointer; display: flex;
+    align-items: center; gap: 8px;
+  }
+  .att-opt:hover { background: var(--brand-soft); color: var(--brand); }
+  .att-opt-sub { font-size: 10px; color: var(--muted); margin-left: auto; }
+
+  /* Body / Memo ──────────────────────────────────────────────── */
+  .ctx-body-preview {
+    min-height: 48px; padding: 8px 10px; border-radius: 8px;
+    border: 1px solid transparent; cursor: text; font-size: 13px;
+    line-height: 1.65; color: var(--fg); transition: border-color 120ms;
+    word-break: break-word;
+  }
+  .ctx-body-preview:hover { border-color: var(--border); background: var(--surface-2); }
+  .ctx-body-preview.empty::before { content: "클릭하여 내용 작성..."; color: var(--muted); font-style: italic; font-size: 12px; }
+  .ctx-body-preview h1 { font-size: 16px; font-weight: 700; margin: 8px 0 4px; }
+  .ctx-body-preview h2 { font-size: 14px; font-weight: 600; margin: 6px 0 3px; }
+  .ctx-body-preview h3 { font-size: 13px; font-weight: 600; margin: 4px 0 2px; }
+  .ctx-body-preview strong { font-weight: 600; }
+  .ctx-body-preview em { font-style: italic; }
+  .ctx-body-preview code {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    background: var(--surface-2); padding: 1px 5px; border-radius: 4px;
+  }
+  .ctx-body-preview blockquote {
+    border-left: 3px solid var(--brand-soft); margin: 4px 0; padding-left: 10px;
+    color: var(--muted);
+  }
+  .ctx-body-preview ul, .ctx-body-preview ol { padding-left: 18px; margin: 4px 0; }
+  .ctx-body-preview li { margin: 2px 0; }
+  .ctx-body-preview p { margin: 4px 0; }
+  .ctx-body-textarea {
+    width: 100%; min-height: 140px; padding: 8px 10px;
+    font-size: 13px; line-height: 1.65; border-radius: 8px;
+    border: 1px solid var(--brand); background: var(--surface);
+    color: var(--fg); font-family: 'JetBrains Mono', monospace;
+    resize: vertical; outline: none; box-sizing: border-box;
+  }
+  .ctx-body-hint { font-size: 10px; color: var(--muted); margin-top: 4px; }
+  .ctx-body-memo .ctx-section-h { gap: 6px; display: flex; align-items: center; }
+
+  /* Date-pair (start/due) ────────────────────────────────────── */
+  .ctx-date-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .ctx-date-pair label {
+    font-size: 10px; color: var(--muted); display: block; margin-bottom: 3px;
+    text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;
+  }
+  .ctx-date-pair input {
+    width: 100%; padding: 6px 8px; border: 1px solid var(--border);
+    border-radius: 7px; background: var(--surface); color: var(--fg);
+    font-size: 12px; font-family: 'JetBrains Mono', monospace;
+  }
+  .ctx-date-pair input:focus { outline: none; border-color: var(--brand); }
+
+  /* ── Tiny toast (in-panel feedback) ─────────────────────────── */
+  .ctx-toast {
+    position: absolute; top: 14px; right: 18px; font-size: 11px;
+    color: var(--st-done); opacity: 0; transition: opacity 200ms;
+    background: var(--surface); padding: 3px 9px; border-radius: 999px;
+    border: 1px solid oklch(80% 0.06 145);
+  }
+  .ctx-toast.show { opacity: 1; }
+</style>
+
+<div id="ctx-panel-{{ item.id }}" data-item-id="{{ item.id }}">
+  <span class="ctx-toast" id="ctx-toast-{{ item.id }}">✓ 저장됨</span>
+
+  <!-- ── HEADER ──────────────────────────────────────────────── -->
+  <div class="ctx-h">
+    <div class="ctx-type">
+      {%- if item.type == 'schedule' -%}<span>★</span> 일정
+      {%- elif item.type == 'task' -%}<span>☐</span> 태스크
+      {%- elif item.type == 'memo' -%}<span>📝</span> 메모
+      {%- else -%}{{ item.type }}
+      {%- endif -%}
+      <span class="ctx-status {{ item.status }}">● {{ item.status }}</span>
+      {%- if item.recurrence_rule -%}
+      <span class="ctx-recur-badge">🔄 {{ {'DAILY':'매일','WEEKDAYS':'평일','WEEKLY':'매주','MONTHLY':'매월'}.get(item.recurrence_rule, item.recurrence_rule) }}</span>
+      {%- endif -%}
+    </div>
+
+    <div class="ctx-title-wrap">
+      <div class="ctx-title"
+           onclick="ctxEditTitle({{ item.id }})"
+           id="ctx-title-{{ item.id }}">{{ item.title }}</div>
+    </div>
+  </div>
+
+  <!-- ── STATUS SEGMENTED ───────────────────────────────────── -->
+  <div class="ctx-section">
+    <div class="ctx-section-h">상태</div>
+    <div class="ctx-status-seg">
+      {% for st, label in [('todo','대기'),('doing','진행'),('waiting','보류'),('done','완료')] %}
+      <button class="ctx-status-btn {{ st }} {% if item.status == st or (st == 'doing' and item.status == 'in_progress') %}active{% endif %}"
+              data-status="{{ st }}"
+              hx-patch="/api/items/{{ item.id }}"
+              hx-vals='{"status": "{{ st }}"}'
+              hx-swap="none"
+              hx-on::after-request="ctxOnStatusChange({{ item.id }}, '{{ st }}', this)">{{ label }}</button>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- ── RECURRENCE ───────────────────────────────────────── -->
+  <div class="ctx-section">
+    <div class="ctx-section-h">🔄 반복</div>
+    <div class="ctx-recur-seg" id="recur-seg-{{ item.id }}">
+      {% set cur_rule = item.recurrence_rule or '' %}
+      {% for rule, label in [('', '없음'), ('DAILY', '매일'), ('WEEKDAYS', '평일'), ('WEEKLY', '매주'), ('MONTHLY', '매월')] %}
+      <button class="ctx-recur-btn {% if cur_rule == rule %}active{% endif %}"
+              onclick="ctxSetRecurrence({{ item.id }}, '{{ rule }}')"
+              title="{{ label }}">{{ label }}</button>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- ── DATE / TIME ──────────────────────────────────────── -->
+  <div class="ctx-section">
+    <div class="ctx-section-h">📅 일정</div>
+    <form class="ctx-date-row"
+          hx-patch="/api/items/{{ item.id }}"
+          hx-trigger="change from:input"
+          hx-swap="none"
+          hx-on::after-request="ctxToast({{ item.id }})">
+      <input class="ctx-date-input" type="datetime-local" name="scheduled_at"
+             value="{{ (item.start_at or item.scheduled_at or '')[:16] }}"
+             id="date-{{ item.id }}">
+    </form>
+    <div class="ctx-quick-row">
+      <button class="ctx-quick-btn" onclick="ctxQuickDate({{ item.id }}, 'today-9')">오늘 9시</button>
+      <button class="ctx-quick-btn" onclick="ctxQuickDate({{ item.id }}, 'today-14')">오늘 14시</button>
+      <button class="ctx-quick-btn" onclick="ctxQuickDate({{ item.id }}, 'tomorrow')">내일</button>
+      <button class="ctx-quick-btn" onclick="ctxQuickDate({{ item.id }}, 'next-mon')">다음 월</button>
+      <button class="ctx-quick-btn" onclick="ctxQuickDate({{ item.id }}, 'clear')">제거</button>
+    </div>
+
+    <!-- Mini-project date range (v1.6) -->
+    <div class="ctx-date-pair" style="margin-top: 12px;">
+      <div>
+        <label>시작</label>
+        <input type="date" name="start_date"
+               value="{{ item.start_date or '' }}"
+               hx-patch="/api/items/{{ item.id }}"
+               hx-trigger="change"
+               hx-include="this"
+               hx-swap="none"
+               hx-on::after-request="ctxToast({{ item.id }})">
+      </div>
+      <div>
+        <label>마감</label>
+        <input type="date" name="due_date"
+               value="{{ item.due_date or '' }}"
+               hx-patch="/api/items/{{ item.id }}"
+               hx-trigger="change"
+               hx-include="this"
+               hx-swap="none"
+               hx-on::after-request="ctxToast({{ item.id }})">
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SUB-TASKS (hierarchical, v1.6) ─────────────────── -->
+  <div class="ctx-section">
+    <div class="ctx-section-h">⊞ 하위 작업</div>
+    <div id="subtasks-{{ item.id }}"
+         hx-get="/api/items/{{ item.id }}/subtasks"
+         hx-trigger="load"
+         hx-swap="innerHTML">
+      <div style="font-size:11px; color:var(--muted);">로딩 중...</div>
+    </div>
+    <form class="sub-add-row"
+          hx-post="/api/items/{{ item.id }}/subtasks"
+          hx-target="#subtasks-{{ item.id }}"
+          hx-swap="innerHTML"
+          hx-on::after-request="this.reset()">
+      <input type="text" name="title" placeholder="새 하위 작업..." autocomplete="off" required>
+      <input type="date" name="due_date" title="마감일 (선택)">
+      <button type="submit">+ 추가</button>
+    </form>
+  </div>
+
+  <!-- ── PROJECT (link/relink) ───────────────────────────── -->
+  <div class="ctx-section">
+    <div class="ctx-section-h">📂 프로젝트</div>
+    {% if project %}
+    <div class="ctx-proj-current" id="proj-current-{{ item.id }}"
+         onclick="ctxToggleProjPick({{ item.id }})">
+      <div style="flex:1;">
+        <div style="font-weight:500; font-size:13px;">{{ project.title }}</div>
+        {% if project.org_name or project.business_name %}
+        <div style="font-size:11px; color:var(--muted); margin-top:2px;">
+          {% if project.org_name %}{{ project.org_name }}{% endif %}
+          {% if project.business_name %} · {{ project.business_name }}{% endif %}
+        </div>
+        {% endif %}
+      </div>
+      {% if project.progress_pct is not none %}
+      <div style="font-family:monospace; font-size:11px; color:var(--brand); font-weight:600;">
+        {{ "%.0f"|format(project.progress_pct) }}%
+      </div>
+      {% endif %}
+      <span style="color:var(--muted); font-size:10px;">⇆</span>
+    </div>
+    {% else %}
+    <div class="ctx-proj-empty" onclick="ctxToggleProjPick({{ item.id }})">
+      ⊕ 프로젝트에 연결
+    </div>
+    {% endif %}
+
+    <div class="ctx-proj-pick" id="proj-pick-{{ item.id }}">
+      <form hx-post="/api/items/{{ item.id }}/project"
+            hx-target="#proj-link-result-{{ item.id }}"
+            hx-swap="innerHTML">
+        <select name="project_id" onchange="this.form.requestSubmit()">
+          <option value="">— 선택 —</option>
+          {% for p in all_projects %}
+          <option value="{{ p.id }}"
+                  {% if project and project.id == p.id %}selected{% endif %}>
+            {% if p.org_name %}{{ p.org_name }} / {% endif %}{% if p.biz_name %}{{ p.biz_name }} / {% endif %}{{ p.title }}
+          </option>
+          {% endfor %}
+        </select>
+      </form>
+      <div id="proj-link-result-{{ item.id }}" style="margin-top:6px;"></div>
+      {% if project %}
+      <button style="margin-top:6px; padding:4px 10px; font-size:11px;
+                     background:transparent; border:1px solid var(--border);
+                     border-radius:6px; color:var(--muted); cursor:pointer;"
+              hx-delete="/api/items/{{ item.id }}/project"
+              hx-target="#proj-link-result-{{ item.id }}"
+              hx-swap="innerHTML">연결 해제</button>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ── ATTENDEES (people) ────────────────────────────────── -->
+  <div class="ctx-section">
+    <div class="ctx-section-h">👥 참석자</div>
+    <div id="attendees-{{ item.id }}"
+         hx-get="/api/items/{{ item.id }}/contacts/partial"
+         hx-trigger="load"
+         hx-swap="innerHTML">
+      <div style="font-size:11px; color:var(--muted);">로딩 중...</div>
+    </div>
+  </div>
+
+  <!-- ── BODY (memo/notes) ────────────────────────────────── -->
+  <div class="ctx-section ctx-body-section {% if item.type == 'memo' %}ctx-body-memo{% endif %}">
+    <div class="ctx-section-h" style="display:flex; align-items:center; gap:6px;">
+      📝 본문
+      {% if item.type == 'memo' %}<span style="font-size:10px; color:var(--brand); background:var(--brand-soft); padding:1px 6px; border-radius:4px; font-weight:600;">MEMO</span>{% endif %}
+    </div>
+    <div class="ctx-body-preview"
+         id="ctx-body-{{ item.id }}"
+         onclick="ctxEditBody({{ item.id }})"
+         data-raw="{{ (item.body or '')|e }}"></div>
+  </div>
+
+  <!-- ── LABELS ───────────────────────────────────────────── -->
+  <div class="ctx-section">
+    <div class="ctx-section-h">🏷 라벨</div>
+    <div id="labels-{{ item.id }}" class="ctx-pills">
+      {% for label in labels %}
+      <span class="ctx-pill" data-type="{{ label.name }}"
+            style="{% if label.color %}background:{{ label.color }}; color:white;{% endif %}">
+        {{ label.name }}
+        <span class="x"
+              hx-delete="/api/items/{{ item.id }}/labels/{{ label.id }}"
+              hx-target="closest .ctx-pill"
+              hx-swap="outerHTML">×</span>
+      </span>
+      {% endfor %}
+    </div>
+    {% if all_labels %}
+    <form class="ctx-add-row"
+          hx-post="/api/items/{{ item.id }}/labels"
+          hx-target="#labels-{{ item.id }}"
+          hx-swap="beforeend">
+      <select name="label_id">
+        {% for l in all_labels %}
+        <option value="{{ l.id }}">{{ l.name }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit">+ 라벨</button>
+    </form>
+    {% endif %}
+  </div>
+
+  <!-- ── TAGS ─────────────────────────────────────────────── -->
+  <div class="ctx-section">
+    <div class="ctx-section-h"># 태그</div>
+    <div id="tags-{{ item.id }}" class="ctx-pills">
+      {% for tag in tags %}
+      <span class="ctx-pill" id="tag-pill-{{ item.id }}-{{ tag.id }}">
+        #{{ tag.name }}
+        <span class="x"
+              hx-delete="/api/items/{{ item.id }}/tags/{{ tag.id }}"
+              hx-target="#tag-pill-{{ item.id }}-{{ tag.id }}"
+              hx-swap="outerHTML">×</span>
+      </span>
+      {% endfor %}
+    </div>
+    <form class="ctx-add-row"
+          hx-post="/api/items/{{ item.id }}/tags"
+          hx-target="#tags-{{ item.id }}"
+          hx-swap="beforeend"
+          hx-on::after-request="this.reset()">
+      <input name="tag_name" placeholder="새 태그..." autocomplete="off">
+      <button type="submit">+ 태그</button>
+    </form>
+  </div>
+
+  <div class="ctx-section">
+    <div class="ctx-section-h" style="display:flex; align-items:center; justify-content:space-between;">
+      <span>📂 연결 파일</span>
+    </div>
+    <div id="ctx-memos-{{ item.id }}">
+    {% for memo in memos %}
+    {% set fname = memo.path.split('\\')[-1].split('/')[-1] %}
+    <div style="display:flex; align-items:center; gap:6px; padding:4px 0; font-size:12px;">
+      <span style="color:var(--muted);">📄</span>
+      <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
+            title="{{ memo.path }}">{{ fname }}</span>
+      {% if memo.evolution_count and memo.evolution_count >= 3 %}
+      <span style="font-size:9px; color:var(--brand); font-weight:700; background:var(--brand-soft);
+                   padding:1px 5px; border-radius:4px;" title="evolution {{ memo.evolution_count }}">
+        ×{{ memo.evolution_count }}
+      </span>
+      {% endif %}
+      <button style="font-size:10px; color:var(--muted); background:none; border:none; cursor:pointer; padding:0 4px;"
+              hx-delete="/api/items/{{ item.id }}/files"
+              hx-vals='{"path":"{{ memo.path }}"}'
+              hx-target="#ctx-memos-{{ item.id }}" hx-swap="innerHTML"
+              onclick="return confirm('연결 해제?')">✕</button>
+    </div>
+    {% endfor %}
+    {% if not memos %}
+    <div style="font-size:11px; color:var(--muted); padding:4px 0;">연결된 파일 없음</div>
+    {% endif %}
+    </div>
+    <form style="display:flex; gap:6px; margin-top:8px;"
+          hx-post="/api/items/{{ item.id }}/files"
+          hx-target="#ctx-memos-{{ item.id }}"
+          hx-swap="innerHTML"
+          hx-on::after-request="this.reset()">
+      <input name="path" placeholder="파일 경로 입력…"
+             style="flex:1; padding:5px 9px; font-size:11px; border:1px solid var(--border);
+                    border-radius:6px; background:var(--bg); color:var(--fg); font-family:inherit;"
+             autocomplete="off">
+      <button type="submit"
+              style="padding:5px 10px; font-size:11px; font-weight:600; border:none;
+                     border-radius:6px; background:var(--brand); color:white; cursor:pointer;">
+        + 연결
+      </button>
+    </form>
+  </div>
+
+  {% if github_issues %}
+  <div class="ctx-section">
+    <div class="ctx-section-h">🐙 GitHub
+      {%- if project and project.github_repo %} ({{ project.github_repo }}){% endif %}
+    </div>
+    {% for issue in github_issues %}
+    <a href="{{ issue.html_url }}" target="_blank"
+       style="display:flex; gap:8px; align-items:center; padding:4px 0;
+              text-decoration:none; color:var(--fg); font-size:12px;">
+      <span style="font-family:monospace; color:var(--muted);">#{{ issue.number }}</span>
+      <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ issue.title }}</span>
+      <span style="font-size:10px; padding:1px 6px; border-radius:4px;
+                   {% if issue.state == 'open' %}background:oklch(94% 0.06 145); color:oklch(35% 0.16 145);
+                   {% else %}background:var(--surface-2); color:var(--muted);{% endif %}">
+        {{ issue.state }}
+      </span>
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- ── Danger zone ──────────────────────────────────────── -->
+  <div class="ctx-section">
+    <button style="width:100%; padding:8px; background:transparent;
+                   border:1px solid var(--border); color:var(--muted);
+                   border-radius:8px; font-size:12px; cursor:pointer;"
+            hx-delete="/api/items/{{ item.id }}"
+            hx-confirm="정말 삭제하시겠습니까?"
+            hx-target="#item-{{ item.id }}"
+            hx-swap="outerHTML">
+      ✕ 항목 삭제
+    </button>
+  </div>
+</div>
+
+<script>
+// ── Status change (no DOM target required) ───────────────────────
+function ctxOnStatusChange(id, status, btn) {
+  // Update button highlights
+  btn.closest('.ctx-status-seg')?.querySelectorAll('.ctx-status-btn').forEach(b => {
+    b.classList.toggle('active', b === btn);
+  });
+  // Update header badge
+  const panel = document.getElementById('ctx-panel-' + id);
+  const badge = panel?.querySelector('.ctx-status');
+  if (badge) {
+    const labels = {todo:'대기', doing:'진행', waiting:'보류', done:'완료'};
+    badge.textContent = '● ' + (labels[status] || status);
+    badge.className = 'ctx-status ' + status;
+  }
+  // Update flow dot if present on this page
+  const dot = document.getElementById('dot-' + id);
+  if (dot) dot.innerHTML = `<span class="mc-dot" data-status="${status}"></span>`;
+  ctxToast(id);
+}
+
+// ── Simple markdown → HTML renderer ─────────────────────────────
+function _mdRender(text) {
+  if (!text) return '';
+  let t = text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  // Headings
+  t = t.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  t = t.replace(/^## (.+)$/gm,  '<h2>$1</h2>');
+  t = t.replace(/^# (.+)$/gm,   '<h1>$1</h1>');
+  // Bold / italic / code
+  t = t.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  t = t.replace(/\*(.+?)\*/g,     '<em>$1</em>');
+  t = t.replace(/`(.+?)`/g,       '<code>$1</code>');
+  // Blockquote
+  t = t.replace(/^&gt; (.+)$/gm,  '<blockquote>$1</blockquote>');
+  // Lists
+  t = t.replace(/^[-*] (.+)$/gm,  '<li>$1</li>');
+  t = t.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+  // Paragraphs (double newline)
+  t = t.split(/\n{2,}/).map(p => {
+    if (/^<(h[1-3]|li|blockquote)/.test(p.trim())) return p;
+    return '<p>' + p.replace(/\n/g, '<br>') + '</p>';
+  }).join('\n');
+  return t;
+}
+
+function ctxRenderBody(id) {
+  const el = document.getElementById('ctx-body-' + id);
+  if (!el || el.tagName === 'TEXTAREA') return;
+  const raw = el.dataset.raw || '';
+  if (raw) {
+    el.innerHTML = _mdRender(raw);
+    el.classList.remove('empty');
+  } else {
+    el.innerHTML = '';
+    el.classList.add('empty');
+  }
+}
+
+// Auto-render on load
+(function() {
+  const id = document.currentScript?.closest('[id^="ctx-panel-"]')?.id?.replace('ctx-panel-', '');
+  if (id) setTimeout(() => ctxRenderBody(id), 0);
+})();
+
+// ── Inline title editing ──────────────────────────────────────────
+function ctxEditTitle(id) {
+  const el = document.getElementById('ctx-title-' + id);
+  if (!el || el.tagName === 'INPUT') return;
+  const cur = el.textContent.trim();
+  const input = document.createElement('input');
+  input.className = 'ctx-title-input';
+  input.value = cur;
+  input.id = 'ctx-title-' + id;
+  el.replaceWith(input);
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
+
+  const save = async () => {
+    const fd = new FormData();
+    fd.append('title', input.value);
+    await fetch('/api/items/' + id, {method: 'PATCH', body: fd});
+    const div = document.createElement('div');
+    div.className = 'ctx-title';
+    div.id = 'ctx-title-' + id;
+    div.textContent = input.value;
+    div.onclick = () => ctxEditTitle(id);
+    input.replaceWith(div);
+    ctxToast(id);
+  };
+  input.addEventListener('blur', save);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+    if (e.key === 'Escape') { input.value = cur; input.blur(); }
+  });
+}
+
+// ── Inline body editing ───────────────────────────────────────────
+function ctxEditBody(id) {
+  const el = document.getElementById('ctx-body-' + id);
+  if (!el || el.tagName === 'TEXTAREA') return;
+  const cur = el.dataset.raw || '';
+
+  const wrap = document.createElement('div');
+  const ta = document.createElement('textarea');
+  ta.className = 'ctx-body-textarea';
+  ta.value = cur;
+  ta.id = 'ctx-body-' + id;
+  ta.rows = Math.max(6, cur.split('\n').length + 2);
+  const hint = document.createElement('div');
+  hint.className = 'ctx-body-hint';
+  hint.textContent = '**굵게** *기울임* `코드` # 제목 — ⌘/Ctrl+Enter 저장, Esc 취소';
+  wrap.appendChild(ta);
+  wrap.appendChild(hint);
+  el.replaceWith(wrap);
+  ta.focus();
+  ta.setSelectionRange(ta.value.length, ta.value.length);
+
+  // Auto-resize
+  const resize = () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; };
+  ta.addEventListener('input', resize);
+  resize();
+
+  const save = async () => {
+    const fd = new FormData();
+    fd.append('body', ta.value);
+    await fetch('/api/items/' + id, {method: 'PATCH', body: fd});
+    const div = document.createElement('div');
+    div.className = 'ctx-body-preview';
+    div.id = 'ctx-body-' + id;
+    div.dataset.raw = ta.value;
+    div.onclick = () => ctxEditBody(id);
+    if (ta.value) { div.innerHTML = _mdRender(ta.value); }
+    else { div.classList.add('empty'); }
+    wrap.replaceWith(div);
+    ctxToast(id);
+  };
+  ta.addEventListener('blur', save);
+  ta.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { ta.value = cur; ta.blur(); }
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); ta.blur(); }
+  });
+}
+
+// ── Quick-date chips ──────────────────────────────────────────────
+async function ctxQuickDate(id, preset) {
+  const now = new Date();
+  let target = null;
+  if (preset === 'today-9')   { target = new Date(now); target.setHours(9, 0, 0, 0); }
+  if (preset === 'today-14')  { target = new Date(now); target.setHours(14, 0, 0, 0); }
+  if (preset === 'tomorrow')  { target = new Date(now); target.setDate(target.getDate()+1); target.setHours(9, 0, 0, 0); }
+  if (preset === 'next-mon')  {
+    target = new Date(now);
+    const days = (8 - target.getDay()) % 7 || 7;
+    target.setDate(target.getDate() + days);
+    target.setHours(9, 0, 0, 0);
+  }
+  const value = target
+    ? `${target.getFullYear()}-${String(target.getMonth()+1).padStart(2,'0')}-${String(target.getDate()).padStart(2,'0')}T${String(target.getHours()).padStart(2,'0')}:${String(target.getMinutes()).padStart(2,'0')}`
+    : '';
+  document.getElementById('date-' + id).value = value;
+  const fd = new FormData();
+  fd.append('scheduled_at', value);
+  await fetch('/api/items/' + id, {method: 'PATCH', body: fd});
+  ctxToast(id);
+}
+
+// ── Project picker reveal ────────────────────────────────────────
+function ctxToggleProjPick(id) {
+  document.getElementById('proj-pick-' + id)?.classList.toggle('open');
+}
+
+// ── In-panel toast ───────────────────────────────────────────────
+function ctxToast(id, msg) {
+  const t = document.getElementById('ctx-toast-' + id);
+  if (!t) return;
+  const orig = t.textContent;
+  if (msg) t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => { t.classList.remove('show'); if (msg) setTimeout(() => t.textContent = orig, 300); }, 2000);
+}
+
+// ── Recurrence picker ────────────────────────────────────────────
+async function ctxSetRecurrence(id, rule) {
+  const seg = document.getElementById('recur-seg-' + id);
+  if (!seg) return;
+  seg.querySelectorAll('.ctx-recur-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent.trim() !== '' && b.getAttribute('onclick').includes(`'${rule}'`));
+  });
+  const fd = new FormData();
+  fd.append('recurrence_rule', rule);
+  await fetch('/api/items/' + id, {method: 'PATCH', body: fd});
+  const labels = {'': '없음', 'DAILY': '매일', 'WEEKDAYS': '평일', 'WEEKLY': '매주', 'MONTHLY': '매월'};
+  ctxToast(id, rule ? `🔄 ${labels[rule] || rule} 설정됨` : '반복 없음');
+  const badge = document.querySelector(`#ctx-panel-${id} .ctx-recur-badge`);
+  if (rule) {
+    if (badge) { badge.textContent = `🔄 ${labels[rule]}`; }
+    else {
+      const typeDiv = document.querySelector(`#ctx-panel-${id} .ctx-type`);
+      if (typeDiv) {
+        const sp = document.createElement('span');
+        sp.className = 'ctx-recur-badge';
+        sp.textContent = `🔄 ${labels[rule]}`;
+        typeDiv.appendChild(sp);
+      }
+    }
+  } else {
+    badge?.remove();
+  }
+}
+</script>

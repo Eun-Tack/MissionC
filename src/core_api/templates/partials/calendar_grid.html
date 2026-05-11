@@ -1,0 +1,291 @@
+{% set _type_icon = {"task": "☐", "schedule": "●", "memo": "📝", "gcal": "🗓"} %}
+
+<style>
+/* ── Shared ─────────────────────────────────────────── */
+.wg-wrap  { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+.wg-gutter { width: 52px; flex-shrink: 0; border-right: 1px solid var(--border); }
+
+/* ── Week/Day header ────────────────────────────────── */
+.wg-head   { display: flex; border-bottom: 1px solid var(--border);
+             background: var(--surface); flex-shrink: 0; }
+.wg-dayhdr { flex: 1; padding: 8px 0 10px; text-align: center;
+             border-right: 1px solid var(--border); cursor: pointer;
+             transition: background 80ms; }
+.wg-dayhdr:hover { background: var(--surface-2); }
+.wg-dayhdr:last-child { border-right: none; }
+.wg-wd     { font-size: 10px; color: var(--muted); font-weight: 600;
+             text-transform: uppercase; letter-spacing: 0.05em; }
+.wg-dn     { font-size: 20px; font-weight: 700; line-height: 1.2; }
+.wg-today .wg-dn { color: var(--brand); }
+.wg-dn-dot { display: inline-flex; align-items: center; justify-content: center;
+             width: 32px; height: 32px; border-radius: 50%;
+             background: var(--brand); color: white; font-size: 18px; }
+
+/* ── All-day row ────────────────────────────────────── */
+.wg-allday-row   { display: flex; min-height: 32px; border-bottom: 2px solid var(--border);
+                   flex-shrink: 0; }
+.wg-allday-label { width: 52px; flex-shrink: 0; border-right: 1px solid var(--border);
+                   font-size: 9px; color: var(--muted); padding: 7px 5px 0;
+                   text-align: right; line-height: 1.3; }
+.wg-allday-col   { flex: 1; border-right: 1px solid var(--border); padding: 3px;
+                   position: relative; min-height: 28px; overflow: hidden; }
+.wg-allday-col:last-child { border-right: none; }
+
+/* ── Scrollable time grid ───────────────────────────── */
+.wg-body-scroll { flex: 1; overflow-y: auto; }
+.wg-body        { display: flex; position: relative; }
+.wg-time-col    { width: 52px; flex-shrink: 0; border-right: 1px solid var(--border);
+                  position: relative; }
+.wg-hour-label  { position: absolute; right: 8px; font-size: 10px; color: var(--muted);
+                  transform: translateY(-50%); white-space: nowrap; user-select: none; }
+.wg-day-col     { flex: 1; position: relative; border-right: 1px solid var(--border);
+                  overflow: hidden; }
+.wg-day-col:last-child { border-right: none; }
+.wg-hline       { position: absolute; left: 0; right: 0; border-top: 1px solid var(--border);
+                  opacity: 0.5; pointer-events: none; }
+.wg-halfline    { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--border);
+                  opacity: 0.25; pointer-events: none; }
+
+/* ── Timed event blocks ─────────────────────────────── */
+.timed-item  { position: absolute; left: 3px; right: 3px; border-radius: 5px;
+               padding: 3px 7px; font-size: 11px; overflow: hidden;
+               cursor: pointer; z-index: 1; border-left: 3px solid transparent;
+               transition: filter 80ms; box-sizing: border-box; }
+.timed-item:hover { filter: brightness(0.9); z-index: 2; }
+.timed-title { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.timed-time  { font-size: 10px; opacity: 0.65; font-family: 'JetBrains Mono', monospace; }
+.timed-item.schedule { background: var(--brand-soft); color: var(--brand);      border-left-color: var(--brand); }
+.timed-item.task     { background: var(--surface-2);  color: var(--fg);         border-left-color: var(--muted); }
+.timed-item.gcal     { background: oklch(91% 0.07 250); color: oklch(28% 0.2 250); border-left-color: oklch(45% 0.2 250); }
+.timed-item.memo     { background: oklch(95% 0.05 60);  color: oklch(38% 0.14 60); border-left-color: oklch(55% 0.15 60); }
+.timed-item.done     { opacity: 0.5; }
+
+/* ── All-day / month chips ──────────────────────────── */
+.cal-item { padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 500;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            cursor: pointer; transition: filter 100ms; display: block;
+            margin-bottom: 2px; }
+.cal-item:hover  { filter: brightness(0.92); }
+.cal-item.gcal   { background: oklch(92% 0.06 250); color: oklch(30% 0.18 250); }
+.cal-item.schedule { background: var(--brand-soft); color: var(--brand); }
+.cal-item.task   { background: var(--surface-2); color: var(--fg); }
+.cal-item.done   { background: oklch(94% 0.04 145); color: oklch(40% 0.12 145);
+                   text-decoration: line-through; opacity: 0.7; }
+.cal-item.memo   { background: oklch(95% 0.05 60); color: oklch(38% 0.14 60); }
+
+/* ── Now indicator ──────────────────────────────────── */
+.wg-now { position: absolute; left: -1px; right: 0; height: 2px;
+          background: oklch(55% 0.25 15); z-index: 5; pointer-events: none; }
+.wg-now::before { content: ''; position: absolute; left: -4px; top: -4px;
+                  width: 10px; height: 10px; border-radius: 50%;
+                  background: oklch(55% 0.25 15); }
+
+/* ── Day-add button ─────────────────────────────────── */
+.day-add-btn { display: none; position: absolute; bottom: 5px; right: 5px;
+               width: 20px; height: 20px; border-radius: 10px;
+               background: var(--brand-soft); border: 1px solid var(--brand);
+               color: var(--brand); font-size: 14px; line-height: 1;
+               cursor: pointer; align-items: center; justify-content: center; }
+.wg-allday-col:hover .day-add-btn,
+.month-cell:hover .day-add-btn { display: flex; }
+
+/* ── Month view ─────────────────────────────────────── */
+.month-grid     { display: grid; grid-template-rows: 36px 1fr; height: 100%; }
+.month-weekdays { display: grid; grid-template-columns: repeat(7, 1fr);
+                  border-bottom: 1px solid var(--border); background: var(--surface); }
+.month-wday     { padding: 8px; text-align: center; font-size: 11px; color: var(--muted);
+                  font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+.month-weeks    { display: grid; grid-auto-rows: 1fr; overflow-y: auto; height: calc(100% - 36px); }
+.month-week     { display: grid; grid-template-columns: repeat(7, 1fr); }
+.month-cell     { border-right: 1px solid var(--border); border-bottom: 1px solid var(--border);
+                  padding: 6px 8px; overflow: hidden; min-height: 80px; position: relative; }
+.month-cell:nth-child(7n) { border-right: none; }
+.month-cell.other-month .cell-num { color: var(--muted); opacity: 0.4; }
+.cell-num       { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+.cell-num.today { display: inline-flex; align-items: center; justify-content: center;
+                  width: 22px; height: 22px; background: var(--brand); color: white;
+                  border-radius: 50%; font-size: 12px; }
+
+/* OOB label update */
+#cal-label { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
+</style>
+
+{% if mode in ("week", "day") %}
+{# ── WEEK / DAY TIME GRID ──────────────────────────── #}
+<div class="wg-wrap">
+
+  {# Day-of-week headers #}
+  <div class="wg-head">
+    <div class="wg-gutter"></div>
+    {% for d in days %}
+    <div class="wg-dayhdr {{ 'wg-today' if d == today else '' }}"
+         {% if mode == 'week' %}
+         hx-get="/partial/calendar?mode=day&date_str={{ d }}"
+         hx-target="#cal-grid" hx-swap="innerHTML"
+         hx-push-url="/calendar?mode=day&date_str={{ d }}"
+         {% endif %}>
+      {% if mode == 'week' %}<div class="wg-wd">{{ weekday_names[loop.index0] }}</div>{% endif %}
+      {% if d == today %}
+      <div class="wg-dn"><span class="wg-dn-dot">{{ d[8:].lstrip('0') }}</span></div>
+      {% else %}
+      <div class="wg-dn">{{ d[8:].lstrip('0') }}</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  {# All-day row #}
+  <div class="wg-allday-row">
+    <div class="wg-allday-label">종일</div>
+    {% for d in days %}
+    <div class="wg-allday-col">
+      {% for item in allday_by_day.get(d, []) %}
+      <div class="cal-item {{ 'gcal' if item.type == 'gcal' else item.type }} {{ 'done' if item.status == 'done' else '' }}"
+           title="{{ item.title }}"
+           {% if item.type != 'gcal' %}
+           hx-get="/partial/context/{{ item.id }}"
+           hx-target="#cal-drawer-body" hx-swap="innerHTML"
+           hx-on::after-request="document.getElementById('cal-drawer').classList.add('open')"
+           {% endif %}>
+        {{ item.title[:24] }}
+      </div>
+      {% endfor %}
+      <button class="day-add-btn" onclick="openNewEvent('{{ d }}')">＋</button>
+    </div>
+    {% endfor %}
+  </div>
+
+  {# Time grid (scrollable) #}
+  <div class="wg-body-scroll" id="wg-scroll">
+    <div class="wg-body" style="height:{{ grid_height }}px;">
+
+      {# Time labels #}
+      <div class="wg-time-col" style="height:{{ grid_height }}px;">
+        {% for h in grid_hours %}
+        {% if loop.index0 > 0 %}
+        <div class="wg-hour-label" style="top:{{ (h - grid_start_h) * hour_px }}px;">
+          {{ '%02d'|format(h) }}:00
+        </div>
+        {% endif %}
+        {% endfor %}
+      </div>
+
+      {# Day columns #}
+      {% for d in days %}
+      <div class="wg-day-col" data-day="{{ d }}" style="height:{{ grid_height }}px;">
+
+        {# Hour lines #}
+        {% for h in grid_hours %}
+        <div class="wg-hline"    style="top:{{ (h - grid_start_h) * hour_px }}px;"></div>
+        <div class="wg-halfline" style="top:{{ (h - grid_start_h) * hour_px + hour_px // 2 }}px;"></div>
+        {% endfor %}
+
+        {# Timed items #}
+        {% for item in timed_by_day.get(d, []) %}
+        <div class="timed-item {{ 'gcal' if item.type == 'gcal' else item.type }} {{ 'done' if item.status == 'done' else '' }}"
+             style="top:{{ item.top_px }}px; height:{{ item.height_px }}px;"
+             title="{{ item.title }}"
+             {% if item.type != 'gcal' %}
+             hx-get="/partial/context/{{ item.id }}"
+             hx-target="#cal-drawer-body" hx-swap="innerHTML"
+             hx-on::after-request="document.getElementById('cal-drawer').classList.add('open')"
+             {% endif %}>
+          {% set start_label = (item.effective_start or item.scheduled_at or '')[11:16] %}
+          {% set end_label   = (item.end_at or '')[11:16] %}
+          {% if item.height_px >= 40 %}
+          <div class="timed-title">{{ _type_icon.get(item.type, '●') }} {{ item.title }}</div>
+          <div class="timed-time">{{ start_label }}{% if end_label %} – {{ end_label }}{% endif %}</div>
+          {% else %}
+          <div class="timed-title">{{ start_label }} {{ item.title }}</div>
+          {% endif %}
+        </div>
+        {% endfor %}
+
+      </div>
+      {% endfor %}
+
+    </div>
+  </div>
+
+</div>
+
+{% elif mode == "month" %}
+{# ── MONTH VIEW ────────────────────────────────────── #}
+<div class="month-grid" style="height:100%;">
+  <div class="month-weekdays">
+    {% for wd in weekday_names %}
+    <div class="month-wday">{{ wd }}</div>
+    {% endfor %}
+  </div>
+  <div class="month-weeks">
+    {% for week in weeks %}
+    <div class="month-week">
+      {% for d in week %}
+      {% set day_items = items_by_day.get(d, []) %}
+      {% set is_current = d[5:7] == anchor[5:7] %}
+      <div class="month-cell {{ '' if is_current else 'other-month' }}">
+        <div class="cell-num {{ 'today' if d == today else '' }}">{{ d[8:].lstrip('0') }}</div>
+        {% for item in day_items[:3] %}
+        <div class="cal-item {{ 'gcal' if item.type == 'gcal' else item.type }} {{ 'done' if item.status == 'done' else '' }}"
+             title="{{ item.title }}"
+             {% if item.type != 'gcal' %}
+             hx-get="/partial/context/{{ item.id }}"
+             hx-target="#cal-drawer-body" hx-swap="innerHTML"
+             hx-on::after-request="document.getElementById('cal-drawer').classList.add('open')"
+             {% endif %}>
+          {{ item.title[:18] }}{% if item.title | length > 18 %}…{% endif %}
+        </div>
+        {% endfor %}
+        {% if day_items | length > 3 %}
+        <div style="font-size:10px; color:var(--muted); margin-top:2px;">+{{ day_items|length - 3 }}개</div>
+        {% endif %}
+        <button class="day-add-btn" onclick="openNewEvent('{{ d }}')">＋</button>
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+{% endif %}
+
+{% if request.headers.get('hx-request') %}
+<span id="cal-label" hx-swap-oob="true">{{ label }}</span>
+{% endif %}
+
+<script>
+if (typeof _neCurrentMode !== 'undefined') {
+  _neCurrentMode = '{{ mode }}';
+  _neCurrentAnchor = '{{ anchor }}';
+}
+
+// Time grid: scroll to current time + draw "now" line
+(function() {
+  if ('{{ mode }}' !== 'week' && '{{ mode }}' !== 'day') return;
+  const scroll = document.getElementById('wg-scroll');
+  if (!scroll) return;
+
+  const now = new Date();
+  const h = now.getHours(), m = now.getMinutes();
+  const GRID_START = {{ grid_start_h }};
+  const GRID_END   = {{ grid_end_h }};
+  const HOUR_PX    = {{ hour_px }};
+
+  if (h >= GRID_START && h < GRID_END) {
+    const top = (h - GRID_START) * HOUR_PX + Math.round(m * HOUR_PX / 60);
+    // Scroll so current time is roughly 1/3 from top
+    scroll.scrollTop = Math.max(0, top - scroll.clientHeight / 3);
+    // Draw now indicator on today's column
+    const col = document.querySelector(`.wg-day-col[data-day="{{ today }}"]`);
+    if (col) {
+      const line = document.createElement('div');
+      line.className = 'wg-now';
+      line.style.top = top + 'px';
+      col.appendChild(line);
+    }
+  } else {
+    // Default: scroll to 8am
+    scroll.scrollTop = (8 - GRID_START) * HOUR_PX;
+  }
+})();
+</script>

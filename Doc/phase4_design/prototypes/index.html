@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>MC Prototype Index</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css">
+<style>
+  :root {
+    --bg: oklch(99% 0.005 270); --fg: oklch(20% 0.02 270);
+    --muted: oklch(55% 0.015 270); --border: oklch(92% 0.01 270);
+    --surface: oklch(98% 0.005 270); --surface-2: oklch(96% 0.008 270);
+    --brand: oklch(58% 0.18 280); --brand-soft: oklch(95% 0.04 280);
+    --accent: oklch(70% 0.15 200);
+    --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: oklch(15% 0.01 270); --fg: oklch(94% 0.005 270);
+      --muted: oklch(65% 0.015 270); --border: oklch(28% 0.015 270);
+      --surface: oklch(20% 0.01 270); --surface-2: oklch(24% 0.012 270);
+      --brand-soft: oklch(28% 0.06 280);
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { font-family: 'Pretendard Variable', system-ui, sans-serif;
+               background: var(--bg); color: var(--fg);
+               font-feature-settings: 'cv11'; min-height: 100vh; }
+
+  .container { max-width: 920px; margin: 0 auto; padding: 80px 32px; }
+  .hero {
+    text-align: center; margin-bottom: 64px;
+  }
+  .hero h1 {
+    font-size: 48px; font-weight: 800; letter-spacing: -0.03em;
+    background: linear-gradient(180deg, var(--fg), var(--brand));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .hero p { color: var(--muted); margin-top: 12px; font-size: 15px; }
+  .hero .meta { font-family: 'JetBrains Mono', monospace; font-size: 11px;
+                color: var(--brand); margin-top: 16px; letter-spacing: 0.1em;
+                text-transform: uppercase; }
+
+  .group-h {
+    font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--muted); margin: 32px 0 12px; padding: 0 4px;
+  }
+  .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+  .proto-card {
+    padding: 20px; border-radius: 14px;
+    background: var(--surface); border: 1px solid var(--border);
+    cursor: pointer; transition: all 240ms var(--ease);
+    text-decoration: none; color: inherit;
+    display: block;
+    position: relative; overflow: hidden;
+  }
+  .proto-card::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+    background: var(--brand);
+    transform: scaleY(0); transform-origin: top;
+    transition: transform 240ms var(--ease);
+  }
+  .proto-card:hover { transform: translateY(-2px); border-color: var(--brand);
+                      box-shadow: 0 8px 32px oklch(0% 0 0 / 0.06); }
+  .proto-card:hover::before { transform: scaleY(1); }
+  .proto-id { font-family: 'JetBrains Mono', monospace; font-size: 11px;
+              color: var(--brand); font-weight: 600; letter-spacing: 0.05em; }
+  .proto-name { font-size: 16px; font-weight: 700; margin-top: 4px; letter-spacing: -0.01em; }
+  .proto-desc { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+  .proto-tags { display: flex; gap: 4px; margin-top: 12px; flex-wrap: wrap; }
+  .proto-tag { font-size: 10px; padding: 2px 8px; background: var(--surface-2);
+               color: var(--muted); border-radius: 999px; font-family: 'JetBrains Mono', monospace; }
+
+  .footer { text-align: center; padding: 80px 0 0; color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <div class="hero">
+    <h1>MC Prototype Gallery</h1>
+    <p>v1.5 — 도전적·혁신적 1인 운영 도구의 7가지 시안</p>
+    <div class="meta">2026-05-06 · htmx + tailwind cdn + waapi · canvas 2d · pretendard</div>
+  </div>
+
+  <div class="group-h">기반 · 시스템</div>
+  <div class="grid">
+    <a class="proto-card" href="_design_system.html">
+      <div class="proto-id">DS · v1.5</div>
+      <div class="proto-name">Design System</div>
+      <div class="proto-desc">색·타이포·애니메이션 토큰 카탈로그. OKLCH 컬러, Pretendard Variable, WAAPI 프리미티브.</div>
+      <div class="proto-tags">
+        <span class="proto-tag">oklch</span>
+        <span class="proto-tag">tokens</span>
+        <span class="proto-tag">a11y</span>
+      </div>
+    </a>
+  </div>
+
+  <div class="group-h">V1.0 핵심 화면</div>
+  <div class="grid">
+    <a class="proto-card" href="sc-01_todays_flow.html">
+      <div class="proto-id">SC-01</div>
+      <div class="proto-name">Today's Flow</div>
+      <div class="proto-desc">메인 화면. 좌측 계층/태그 사이드바, 시간순 타임라인, 우측 컨텍스트 패널, 하단 Quick Capture.</div>
+      <div class="proto-tags">
+        <span class="proto-tag">FR-FLOW-01~03</span>
+        <span class="proto-tag">FR-CAP-01~02</span>
+        <span class="proto-tag">FR-INT-GCAL</span>
+      </div>
+    </a>
+    <a class="proto-card" href="sc-04_context_panel.html">
+      <div class="proto-id">SC-04 ⭐</div>
+      <div class="proto-name">Context Panel</div>
+      <div class="proto-desc">0.5초 펼침 · 프로젝트·태그·메모·GitHub 통합. Memo→Task Morph 인터랙티브 데모 포함.</div>
+      <div class="proto-tags">
+        <span class="proto-tag">FR-FLOW-03</span>
+        <span class="proto-tag">FR-MEMO-07</span>
+      </div>
+    </a>
+    <a class="proto-card" href="sc-13_calendar.html">
+      <div class="proto-id">SC-13</div>
+      <div class="proto-name">Calendar</div>
+      <div class="proto-desc">주/월 뷰 토글, 드래그 재일정, 미배정 사이드바. 요일 밑 밀도 히트맵, Now-line pulse.</div>
+      <div class="proto-tags">
+        <span class="proto-tag">FR-CAL-01</span>
+        <span class="proto-tag">FR-INT-GCAL</span>
+        <span class="proto-tag">drag</span>
+      </div>
+    </a>
+    <a class="proto-card" href="sc-14_hierarchy.html">
+      <div class="proto-id">SC-14</div>
+      <div class="proto-name">Org Hierarchy</div>
+      <div class="proto-desc">소속·사업·프로젝트 3단 계층 카드. 진척도 그라디언트, 단계 칩 인라인, 무소속 섹션.</div>
+      <div class="proto-tags">
+        <span class="proto-tag">FR-ORG-01~03</span>
+        <span class="proto-tag">FR-PROJ-01</span>
+      </div>
+    </a>
+    <a class="proto-card" href="sc-06_project_detail.html">
+      <div class="proto-id">SC-06</div>
+      <div class="proto-name">Project Detail</div>
+      <div class="proto-desc">단계 타임라인(과거·현재·미래), 라벨 필터, 연결 파일·GitHub, 활동 로그.</div>
+      <div class="proto-tags">
+        <span class="proto-tag">FR-PROJ-02~04</span>
+        <span class="proto-tag">FR-LABEL-01</span>
+      </div>
+    </a>
+    <a class="proto-card" href="sc-16_memo_editor.html" style="border-color: var(--brand);">
+      <div class="proto-id">SC-16 ★</div>
+      <div class="proto-name">Memo Editor (Milkdown)</div>
+      <div class="proto-desc">블록형 노션 스타일 에디터. 슬래시 커맨드 팔레트, 인라인 멘션, 폴더 트리, outline 사이드바, 하단 lifecycle 타임라인.</div>
+      <div class="proto-tags">
+        <span class="proto-tag">FR-MEMO-06</span>
+        <span class="proto-tag">FR-MEMO-07</span>
+        <span class="proto-tag">milkdown</span>
+      </div>
+    </a>
+  </div>
+
+  <div class="group-h">미래 · 도전적 시안 (V1.1·V1.2)</div>
+  <div class="grid">
+    <a class="proto-card" href="_innovative_showcase.html" style="border-color: var(--brand);">
+      <div class="proto-id">★ Showcase</div>
+      <div class="proto-name">Innovation Showcase</div>
+      <div class="proto-desc">Voice Glass · Time Constellation · Memo Lifecycle · Reflection Constellation · Memo→Task Morph. 다크 톤, ambient 파티클, canvas 2d.</div>
+      <div class="proto-tags">
+        <span class="proto-tag">FR-UX-04</span>
+        <span class="proto-tag">FR-UX-01</span>
+        <span class="proto-tag">FR-INSIGHTS-01</span>
+      </div>
+    </a>
+  </div>
+
+  <div class="footer">
+    파일 위치: <code style="font-family: 'JetBrains Mono', monospace;">Doc/phase4_design/prototypes/</code><br>
+    Phase 5 코딩 시 이 HTML/CSS를 그대로 가져다 씁니다 — 빌드 파이프라인 0.
+  </div>
+
+</div>
+
+</body>
+</html>

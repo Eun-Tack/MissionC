@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block title %}Evening Review · MC{% endblock %}
+
+{% block head %}
+<style>
+  .page   { max-width: 780px; margin: 0 auto; padding: 48px 32px; }
+  .hero-date { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; }
+  .hero-sub  { font-size: 13px; color: var(--muted); margin-top: 6px; }
+
+  .summary-bar { display: flex; gap: 16px; margin: 24px 0;
+                 background: var(--surface); border: 1px solid var(--border);
+                 border-radius: 14px; padding: 20px 24px; align-items: center; }
+  .sum-num   { font-size: 32px; font-weight: 800; letter-spacing: -0.02em; }
+  .sum-label { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .sum-divider { width: 1px; height: 40px; background: var(--border); }
+  .done-pct  { font-size: 22px; font-weight: 700; color: var(--st-done); margin-left: auto; }
+
+  .section-h { font-size: 11px; font-weight: 600; text-transform: uppercase;
+               letter-spacing: 0.08em; color: var(--muted); margin: 28px 0 12px; }
+
+  /* Review item card */
+  .review-card { background: var(--surface); border: 1px solid var(--border);
+                 border-radius: 12px; padding: 16px 20px; margin-bottom: 12px; }
+  .review-card.saved { opacity: 0.6; }
+  .review-title { font-size: 14px; font-weight: 600; margin-bottom: 12px;
+                  display: flex; align-items: center; gap: 8px; }
+  .review-form  { display: grid; gap: 10px; }
+  .form-row     { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .form-label   { font-size: 11px; color: var(--muted); width: 60px; flex-shrink: 0; }
+  .chip-group   { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip-option  { padding: 4px 10px; font-size: 12px; border-radius: 999px;
+                  border: 1px solid var(--border); background: var(--surface-2);
+                  color: var(--muted); cursor: pointer; transition: all 120ms; }
+  .chip-option:has(input:checked) { border-color: var(--brand); background: var(--brand-soft);
+                                     color: var(--brand); }
+  .chip-option input { display: none; }
+  .free-text    { flex: 1; min-width: 200px; padding: 6px 10px; border: 1px solid var(--border);
+                  border-radius: 8px; font-size: 12px; background: var(--surface); color: var(--fg); }
+  .save-btn     { padding: 6px 14px; background: var(--brand); color: white; border: none;
+                  border-radius: 8px; font-size: 12px; cursor: pointer; font-weight: 500;
+                  transition: opacity 120ms; }
+  .save-btn:hover { opacity: 0.9; }
+  .review-row-saved { padding: 8px; font-size: 13px; }
+
+  .all-done { text-align: center; padding: 48px; }
+  .all-done-icon { font-size: 48px; margin-bottom: 16px; }
+  .all-done-text { font-size: 18px; font-weight: 700; color: var(--st-done); }
+  .all-done-sub  { font-size: 13px; color: var(--muted); margin-top: 8px; }
+
+  .action-row { display: flex; gap: 8px; margin-top: 32px; }
+  .btn-primary { padding: 12px 24px; background: var(--brand); color: white; border: none;
+                 border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer;
+                 text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+  .btn-ghost   { padding: 12px 20px; background: var(--surface); color: var(--fg);
+                 border: 1px solid var(--border); border-radius: 10px; font-size: 14px;
+                 cursor: pointer; text-decoration: none; display: inline-flex;
+                 align-items: center; gap: 6px; }
+</style>
+{% endblock %}
+
+{% block body %}
+{% set active_nav = 'flow' %}
+{% include "partials/topbar.html" %}
+
+<div class="page">
+  <div style="margin-bottom:32px;">
+    <div style="font-size:13px; color:var(--muted); margin-bottom:6px;">저녁 회고 🌙</div>
+    <div class="hero-date">{{ date_korean }} {{ weekday_korean }}요일</div>
+    <div class="hero-sub">오늘 하루를 정리합니다</div>
+  </div>
+
+  <div class="summary-bar">
+    <div>
+      <div class="sum-num" style="color:var(--st-done);">{{ done_count }}</div>
+      <div class="sum-label">완료</div>
+    </div>
+    <div class="sum-divider"></div>
+    <div>
+      <div class="sum-num" style="color:var(--st-waiting);">{{ incomplete|length }}</div>
+      <div class="sum-label">미완료</div>
+    </div>
+    <div class="sum-divider"></div>
+    <div>
+      <div class="sum-num">{{ total }}</div>
+      <div class="sum-label">전체</div>
+    </div>
+    {% if total > 0 %}
+    <div class="done-pct">
+      {{ ((done_count / total) * 100)|round|int }}%
+    </div>
+    {% endif %}
+  </div>
+
+  {% if not incomplete %}
+  <div class="all-done">
+    <div class="all-done-icon">✦</div>
+    <div class="all-done-text">오늘 모든 항목 완료!</div>
+    <div class="all-done-sub">수고하셨습니다</div>
+  </div>
+  {% else %}
+  <div class="section-h">미완료 항목 — 사유 및 결정 (FR-DAY-04)</div>
+
+  {% for item in incomplete %}
+  <div class="review-card {% if item.category %}saved{% endif %}" id="card-{{ item.id }}">
+    <div class="review-title">
+      <span class="mc-dot" data-status="{{ item.status }}"></span>
+      {{ item.title }}
+      {% for tag in item.tags %}
+      <span class="tag-chip">#{{ tag }}</span>
+      {% endfor %}
+    </div>
+
+    {% if item.category %}
+    <div class="review-row-saved">
+      <span style="color:var(--st-done)">✓ 기록됨</span>
+    </div>
+    {% else %}
+    <div id="review-{{ item.id }}">
+      <form class="review-form"
+            hx-post="/api/evening-review"
+            hx-target="#review-{{ item.id }}"
+            hx-swap="outerHTML">
+        <input type="hidden" name="item_id" value="{{ item.id }}">
+        <input type="hidden" name="review_date" value="{{ today_str }}">
+
+        <div class="form-row">
+          <span class="form-label">사유</span>
+          <div class="chip-group">
+            {% for val, label in categories %}
+            <label class="chip-option">
+              <input type="radio" name="category" value="{{ val }}" {% if loop.first %}checked{% endif %}>
+              {{ label }}
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="form-row">
+          <span class="form-label">결정</span>
+          <div class="chip-group">
+            {% for val, label in decisions %}
+            <label class="chip-option">
+              <input type="radio" name="decision" value="{{ val }}" {% if loop.first %}checked{% endif %}>
+              {{ label }}
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="form-row">
+          <span class="form-label">메모</span>
+          <input class="free-text" name="free_text" placeholder="선택사항 — 자유 기록">
+          <button type="submit" class="save-btn">저장</button>
+        </div>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  <div class="action-row">
+    <a href="/" class="btn-primary">Flow로 이동</a>
+    <a href="/morning" class="btn-ghost">☀ 내일 아침 미리보기</a>
+  </div>
+</div>
+{% endblock %}

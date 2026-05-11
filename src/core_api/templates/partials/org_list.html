@@ -1,0 +1,32 @@
+{#
+  Org list partial — used in setup wizard (step 2) and settings page.
+  Context: orgs (list of dicts with id, name, color)
+#}
+<div id="org-list">
+  {% if orgs %}
+    {% for org in orgs %}
+    <div style="display:flex; align-items:center; gap:10px; padding:10px 14px;
+                background:var(--surface); border:1px solid var(--border);
+                border-radius:10px; margin-bottom:6px;">
+      <span style="width:28px; height:28px; border-radius:8px; display:inline-flex;
+                   align-items:center; justify-content:center; font-weight:800;
+                   color:white; font-size:13px; flex-shrink:0;
+                   background:{{ org.color or 'var(--brand)' }};">
+        {{ org.name[0] }}
+      </span>
+      <span style="font-size:14px; font-weight:500; flex:1;">{{ org.name }}</span>
+      <button style="background:none; border:none; color:var(--muted); cursor:pointer;
+                     font-size:18px; padding:0 4px; line-height:1;"
+              hx-delete="/settings/org/{{ org.id }}"
+              hx-target="#org-list"
+              hx-swap="outerHTML"
+              hx-confirm="'{{ org.name }}' 소속을 삭제하시겠습니까?"
+              title="삭제">×</button>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div style="text-align:center; padding:24px; color:var(--muted); font-size:13px;">
+      아직 소속이 없습니다
+    </div>
+  {% endif %}
+</div>

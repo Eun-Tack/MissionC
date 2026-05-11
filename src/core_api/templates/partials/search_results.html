@@ -1,0 +1,29 @@
+{% set _type_icon = {"task": "☐", "schedule": "📅", "memo": "📝", "project_ref": "📁"} %}
+{% if results %}
+{% for r in results %}
+<div class="result-item"
+     onclick="window.location.href='/?focus={{ r.id }}'">
+  <div class="result-header">
+    <span class="result-icon">{{ _type_icon.get(r.type, '•') }}</span>
+    <span class="result-title">{{ r.title }}</span>
+    <span class="result-status">{{ r.status_ko }}</span>
+  </div>
+  {% if r.snippet and r.snippet != r.title %}
+  <div class="result-snippet">{{ r.snippet | safe }}</div>
+  {% endif %}
+  {% if r.scheduled_at %}
+  <div class="result-time">📅 {{ r.scheduled_at[:10] }}</div>
+  {% endif %}
+</div>
+{% endfor %}
+{% elif q %}
+<div class="empty-state">
+  <div class="empty-icon">🔍</div>
+  "{{ q }}"에 대한 결과가 없습니다
+</div>
+{% else %}
+<div class="empty-state">
+  <div class="empty-icon">🔍</div>
+  검색어를 입력하세요
+</div>
+{% endif %}

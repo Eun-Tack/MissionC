@@ -1,0 +1,288 @@
+/* ── Radial Command Palette V1.5 — FR-RADIAL-04 / ADR-011 § 4.2 ──── */
+
+/* Root overlay */
+.radial {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.radial-overlay {
+  position: absolute;
+  inset: 0;
+  background: oklch(0% 0 0 / 0.40);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  cursor: pointer;
+}
+
+/* Wheel */
+.radial-wheel {
+  position: relative;
+  width: 480px;
+  height: 480px;
+  will-change: transform, opacity;
+  z-index: 1;
+}
+@media (max-width: 600px) {
+  .radial-wheel { width: 80vmin; height: 80vmin; }
+}
+@media (max-width: 480px) {
+  .radial { display: none !important; }
+}
+
+/* SVG */
+.radial-svg {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  inset: 0;
+}
+
+/* Slices */
+.radial-slice {
+  fill: oklch(98% 0.005 270 / 0.82);
+  stroke: oklch(88% 0.012 270 / 0.6);
+  stroke-width: 1.5;
+  cursor: pointer;
+  transition: fill 80ms ease-out, filter 80ms ease-out;
+}
+.radial-slice:hover,
+.radial-slice.focused {
+  fill: oklch(58% 0.18 280 / 0.20);
+  filter: drop-shadow(0 0 14px oklch(58% 0.18 280 / 0.45));
+}
+.radial-slice.disabled {
+  fill: oklch(93% 0.005 270 / 0.55);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+@media (prefers-color-scheme: dark) {
+  .radial-slice {
+    fill: oklch(22% 0.01 270 / 0.88);
+    stroke: oklch(35% 0.015 270 / 0.55);
+  }
+  .radial-slice:hover,
+  .radial-slice.focused {
+    fill: oklch(58% 0.18 280 / 0.28);
+  }
+  .radial-slice.disabled {
+    fill: oklch(18% 0.005 270 / 0.65);
+  }
+}
+
+@keyframes radial-shake {
+  0%, 100% { transform: translateX(0); }
+  25%       { transform: translateX(-5px); }
+  75%       { transform: translateX(5px); }
+}
+.radial-slice.shake { animation: radial-shake 200ms ease-out; }
+
+/* Labels */
+.radial-labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.radial-label {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  transition: opacity 80ms ease-out;
+}
+.radial-label .r-symbol { font-size: 18px; line-height: 1; }
+.radial-label .r-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  transition: color 80ms ease-out;
+}
+.radial-label .r-kbd {
+  font-size: 9px;
+  color: var(--muted);
+  opacity: 0.55;
+  font-family: 'JetBrains Mono', monospace;
+}
+.radial-label.focused .r-name { color: var(--brand); }
+.radial-label.disabled .r-name,
+.radial-label.disabled .r-symbol { opacity: 0.4; }
+
+/* Hub (center circle) */
+.radial-hub {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 160px; height: 160px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  box-shadow:
+    0 0 0 8px oklch(98% 0.005 270 / 0.75),
+    0 12px 40px oklch(0% 0 0 / 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  overflow: hidden;
+  transition: overflow 0ms;
+}
+.radial-hub.form-active { overflow: visible; }
+
+@media (prefers-color-scheme: dark) {
+  .radial-hub {
+    box-shadow:
+      0 0 0 8px oklch(22% 0.01 270 / 0.8),
+      0 12px 40px oklch(0% 0 0 / 0.45);
+  }
+}
+
+.hub-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  text-align: center;
+  padding: 0 14px;
+  line-height: 1.4;
+  transition: font-size 120ms var(--ease), color 120ms var(--ease);
+  user-select: none;
+}
+.hub-label.large {
+  font-size: 17px;
+  color: var(--brand);
+  font-weight: 700;
+}
+
+/* Hub inline form */
+.hub-form {
+  width: 100%;
+  padding: 0 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.hub-input {
+  width: 100%;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  background: var(--surface-2);
+  color: var(--fg);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  outline: none;
+  text-align: center;
+  transition: border-color 120ms;
+}
+.hub-input:focus { border-color: var(--brand); }
+.hub-input.error {
+  border-color: oklch(55% 0.22 25);
+  animation: radial-shake 200ms ease-out;
+}
+
+/* Search results panel — floats below wheel */
+.radial-search-panel {
+  position: absolute;
+  top: calc(50% + 258px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(360px, 80vw);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px oklch(0% 0 0 / 0.22);
+  max-height: 210px;
+  overflow-y: auto;
+  z-index: 3;
+}
+.r-search-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background 60ms;
+}
+.r-search-row:hover,
+.r-search-row.sel { background: var(--brand-soft); }
+.r-search-row .r-kind {
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* Hint bar */
+.radial-hint {
+  position: absolute;
+  top: calc(50% + 262px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 16px;
+  font-size: 11px;
+  color: oklch(80% 0.01 270 / 0.85);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 3;
+}
+.radial-hint kbd {
+  font-family: monospace;
+  font-size: 10px;
+  padding: 1px 5px;
+  background: oklch(98% 0.005 270 / 0.12);
+  border: 1px solid oklch(98% 0.005 270 / 0.25);
+  border-radius: 3px;
+}
+
+/* FAB */
+.radial-fab {
+  position: fixed;
+  bottom: 24px; right: 24px;
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  background: var(--brand);
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 20px oklch(58% 0.18 280 / 0.4);
+  transition: transform 120ms var(--ease), box-shadow 120ms;
+  z-index: 1500;
+}
+.radial-fab:hover {
+  transform: scale(1.08);
+  box-shadow: 0 6px 28px oklch(58% 0.18 280 / 0.52);
+}
+.radial-fab:active { transform: scale(0.94); }
+
+/* Reduced motion — ADR-011 § 4.2, BR-RADIAL-41 */
+@media (prefers-reduced-motion: reduce) {
+  .radial-slice,
+  .radial-label,
+  .hub-label,
+  .hub-input,
+  .radial-fab { transition: none !important; }
+  .radial-slice.shake { animation: none !important; }
+}

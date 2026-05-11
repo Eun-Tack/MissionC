@@ -1,0 +1,47 @@
+{#
+  Org section partial — used in hierarchy.html and CRUD responses.
+  Context: org (dict with id, name, color, businesses list)
+#}
+<div id="org-{{ org.id }}" class="org-section">
+  <div class="org-header">
+    <div class="org-logo" style="background: {{ org.color or 'var(--brand)' }};">
+      {{ org.name[0] }}
+    </div>
+    <div>
+      <div class="org-name">{{ org.name }}</div>
+      <div class="org-meta">
+        {{ org.businesses|length }}개 사업 ·
+        {{ org.businesses|sum(attribute='projects', start=[])|list|length }}개 프로젝트
+      </div>
+    </div>
+  </div>
+
+  {% for biz in org.businesses %}
+  {% include "partials/biz_block.html" %}
+  {% endfor %}
+
+  {% if not org.businesses %}
+  <div style="font-size:13px; color:var(--muted); padding-left:24px; margin-bottom:16px;">사업 없음</div>
+  {% endif %}
+
+  <!-- Add business inline form -->
+  <div style="padding-left:24px; margin-top:4px;">
+    <div class="add-inline-form" id="add-biz-form-{{ org.id }}" style="display:none; margin-bottom:12px;">
+      <form hx-post="/api/businesses"
+            hx-target="#org-{{ org.id }}"
+            hx-swap="outerHTML"
+            style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
+        <input type="hidden" name="org_id" value="{{ org.id }}">
+        <input class="h-input" type="text" name="name"
+               placeholder="사업 이름" style="flex:2; min-width:160px;" required autofocus>
+        <input class="h-input" type="text" name="description"
+               placeholder="설명 (선택)" style="flex:2; min-width:160px;">
+        <button type="submit" class="h-btn-primary">추가</button>
+        <button type="button" class="h-btn-ghost"
+                onclick="document.getElementById('add-biz-form-{{ org.id }}').style.display='none'">취소</button>
+      </form>
+    </div>
+    <button class="h-btn-add"
+            onclick="toggleAddForm('add-biz-form-{{ org.id }}')">+ 사업</button>
+  </div>
+</div>

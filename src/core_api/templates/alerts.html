@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}알림 센터 · MC{% endblock %}
+
+{% block head %}
+<style>
+  .page { display: grid; grid-template-rows: 56px 1fr; height: 100vh; }
+  .badge { display: inline-flex; align-items: center; justify-content: center;
+           min-width: 18px; height: 18px; border-radius: 9px; background: var(--brand);
+           color: white; font-size: 10px; font-weight: 700; padding: 0 4px; margin-left: 4px; }
+
+  .content { overflow-y: auto; padding: 32px 48px; max-width: 960px; margin: 0 auto; width: 100%; }
+  .page-h { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 8px;
+            display: flex; align-items: center; gap: 12px; }
+  .page-sub { font-size: 13px; color: var(--muted); margin-bottom: 24px; }
+
+  .actions-row { display: flex; gap: 10px; margin-bottom: 28px; }
+  .btn-ghost { padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border);
+               background: transparent; color: var(--fg); font-size: 13px; cursor: pointer; }
+  .btn-ghost:hover { background: var(--surface-2); }
+  .btn-danger { padding: 8px 16px; border-radius: 8px; border: 1px solid oklch(82% 0.06 25);
+                background: transparent; color: oklch(50% 0.18 25); font-size: 13px; cursor: pointer; }
+  .btn-danger:hover { background: oklch(97% 0.03 25); }
+
+  .sec-h { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+           color: var(--muted); font-weight: 600; margin: 0 0 12px;
+           padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  .section { margin-bottom: 36px; }
+
+  /* Notification rows */
+  .notif-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+               background: var(--surface); border-radius: 8px; margin-bottom: 8px; }
+  .notif-row.dismissed { opacity: 0.5; }
+  .kind-pill { font-size: 10px; padding: 2px 7px; border-radius: 999px; font-weight: 600;
+               background: var(--brand-soft); color: var(--brand); white-space: nowrap; }
+  .notif-channel { font-size: 12px; color: var(--muted); }
+  .notif-title { font-size: 13px; flex: 1; }
+  .notif-time { font-size: 11px; color: var(--muted); flex-shrink: 0; }
+  .btn-dismiss { padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border);
+                 background: transparent; color: var(--muted); font-size: 11px; cursor: pointer;
+                 flex-shrink: 0; }
+  .btn-dismiss:hover { background: var(--surface-2); }
+
+  /* Retry queue */
+  .retry-row { padding: 12px 14px; background: var(--surface); border-radius: 8px;
+               margin-bottom: 8px; }
+  .retry-header { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  .retry-op { font-size: 10px; background: oklch(94% 0.07 25); color: oklch(40% 0.21 25);
+              padding: 2px 6px; border-radius: 4px; font-weight: 600; }
+  .retry-resolved { background: oklch(94% 0.07 145); color: oklch(30% 0.18 145); }
+  .retry-target { font-size: 13px; font-weight: 500; flex: 1; }
+  .retry-meta { font-size: 11px; color: var(--muted); }
+  .retry-err { font-size: 12px; color: var(--muted); font-family: 'JetBrains Mono', monospace;
+               margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .btn-resolve { padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border);
+                 background: transparent; color: var(--muted); font-size: 11px; cursor: pointer; }
+  .btn-resolve:hover { background: var(--surface-2); }
+  .empty-msg { color: var(--muted); font-size: 13px; padding: 16px 0; }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="page">
+  {% set active_nav = 'alerts' %}
+  {% include "partials/topbar.html" %}
+
+  <div class="content">
+    <div class="page-h">
+      알림 센터
+      {% if undismissed_count > 0 %}
+      <span class="badge" id="undismissed-count-header">{{ undismissed_count }}</span>
+      {% endif %}
+    </div>
+    <div class="page-sub">알림 이벤트 및 재시도 큐</div>
+
+    <div class="actions-row">
+      {% if undismissed_count > 0 %}
+      <button class="btn-danger"
+              hx-post="/api/alerts/dismiss-all"
+              hx-target="#undismissed-count"
+              hx-swap="outerHTML">전체 해제</button>
+      {% endif %}
+      <a href="/diag" class="btn-ghost" style="text-decoration:none;">← 진단 페이지</a>
+    </div>
+
+    <!-- Notifications -->
+    <div class="section">
+      <div class="sec-h">알림 이벤트</div>
+      {% if notifs %}
+      {% for n in notifs %}
+      <div class="notif-row {{ 'dismissed' if n.dismissed else '' }}" id="notif-{{ n.id }}">
+        <span class="kind-pill">{{ n.kind }}</span>
+        <span class="notif-channel">{{ n.channel }}</span>
+        {% if n.item_title %}
+        <span class="notif-title">{{ n.item_title }}</span>
+        {% else %}
+        <span class="notif-title" style="color:var(--muted);">—</span>
+        {% endif %}
+        <span class="notif-time">{{ (n.sent_at or '')[:16] | replace('T', ' ') }}</span>
+        {% if not n.dismissed %}
+        <button class="btn-dismiss"
+                hx-post="/alerts/{{ n.id }}/dismiss"
+                hx-target="#undismissed-count"
+                hx-swap="outerHTML"
+                hx-on::after-request="this.closest('.notif-row').classList.add('dismissed')">해제</button>
+        {% else %}
+        <span style="font-size:11px; color:var(--muted);">해제됨</span>
+        {% endif %}
+      </div>
+      {% endfor %}
+      {% else %}
+      <div class="empty-msg">알림 없음</div>
+      {% endif %}
+    </div>
+
+    <!-- Retry queue -->
+    <div class="section">
+      <div class="sec-h">재시도 큐</div>
+      {% if retries %}
+      {% for r in retries %}
+      <div class="retry-row" id="retry-{{ r.id }}">
+        <div class="retry-header">
+          <span class="retry-op {{ 'retry-resolved' if r.resolved else '' }}">
+            {{ '해결됨' if r.resolved else r.operation }}
+          </span>
+          <span class="retry-target">{{ r.target }}</span>
+          <span class="retry-meta">시도 {{ r.attempts }}회</span>
+          {% if not r.resolved %}
+          <button class="btn-resolve"
+                  hx-post="/api/retry/{{ r.id }}/resolve"
+                  hx-target="#retry-{{ r.id }}"
+                  hx-swap="outerHTML">해결로 표시</button>
+          {% endif %}
+        </div>
+        {% if r.last_error %}
+        <div class="retry-err">{{ r.last_error }}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+      {% else %}
+      <div class="empty-msg">재시도 대기 항목 없음</div>
+      {% endif %}
+    </div>
+
+  </div>
+</div>
+{% endblock %}

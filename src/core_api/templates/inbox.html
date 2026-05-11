@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}수신함 · MC{% endblock %}
+
+{% block head %}
+<style>
+  .page { display: grid; grid-template-rows: 56px 1fr; height: 100vh; }
+  .content { overflow-y: auto; padding: 32px 48px; max-width: 960px; margin: 0 auto; width: 100%; }
+  .page-h { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 24px;
+            display: flex; align-items: center; gap: 12px; }
+
+  /* Inbox cards */
+  .inbox-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+                padding: 16px; margin-bottom: 12px; }
+  .inbox-card:hover { border-color: var(--brand-soft); }
+  .inbox-source { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em;
+                  color: var(--muted); font-weight: 600; margin-bottom: 6px;
+                  display: flex; align-items: center; gap: 6px; }
+  .src-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--brand); }
+  .src-dot[data-src="telegram"] { background: oklch(55% 0.20 200); }
+  .src-dot[data-src="voice"]    { background: oklch(60% 0.18 40); }
+  .inbox-text { font-size: 14px; font-weight: 500; margin-bottom: 12px; line-height: 1.5; }
+  .inbox-actions { display: flex; gap: 8px; align-items: center; }
+  .inbox-accept-form { display: flex; gap: 8px; flex: 1; flex-wrap: wrap; }
+  .inbox-input { flex: 1; min-width: 160px; padding: 7px 10px; border: 1px solid var(--border);
+                 border-radius: 6px; background: var(--bg); font-size: 13px; color: var(--fg); }
+  .inbox-select { padding: 7px 10px; border: 1px solid var(--border);
+                  border-radius: 6px; background: var(--bg); font-size: 13px; color: var(--fg); }
+  .btn-accept { padding: 7px 14px; border-radius: 6px; background: var(--brand); color: white;
+                font-size: 13px; font-weight: 500; border: none; cursor: pointer; white-space: nowrap; }
+  .btn-accept:hover { filter: brightness(1.1); }
+  .btn-reject { padding: 7px 12px; border-radius: 6px; background: transparent;
+                border: 1px solid var(--border); color: var(--muted); font-size: 13px; cursor: pointer; }
+  .btn-reject:hover { border-color: oklch(60% 0.21 25); color: oklch(60% 0.21 25); }
+
+  /* Processed section */
+  .sec-h { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+           color: var(--muted); font-weight: 600; margin: 28px 0 12px;
+           padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  .proc-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+              border-radius: 8px; font-size: 13px; }
+  .proc-row:hover { background: var(--surface); }
+  .proc-status { font-size: 10px; padding: 2px 7px; border-radius: 999px; font-weight: 500; }
+  .proc-status.accepted { background: oklch(94% 0.07 145); color: oklch(35% 0.18 145); }
+  .proc-status.rejected { background: var(--surface-2); color: var(--muted); }
+  .proc-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .proc-linked { font-size: 11px; color: var(--muted); }
+  .proc-time { font-size: 11px; color: var(--muted); flex-shrink: 0; }
+
+  .empty-state { text-align: center; color: var(--muted); padding: 48px 0; font-size: 14px; }
+  .empty-icon { font-size: 32px; margin-bottom: 12px; }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="page">
+  {% set active_nav = 'inbox' %}
+  {% include "partials/topbar.html" %}
+
+  <div class="content">
+    <div class="page-h">
+      수신함
+      {% if pending_count > 0 %}
+      <span class="badge">{{ pending_count }}</span>
+      {% endif %}
+    </div>
+
+    <div id="inbox-pending">
+      {% include "partials/inbox_list.html" %}
+    </div>
+
+    {% if processed %}
+    <div class="sec-h">처리 완료</div>
+    {% for item in processed %}
+    <div class="proc-row">
+      <span class="proc-status {{ item.status }}">{{ '수락' if item.status == 'accepted' else '거절' }}</span>
+      <span class="proc-text">{{ item.raw_text }}</span>
+      {% if item.accepted_title %}
+      <span class="proc-linked">→ {{ item.accepted_title }}</span>
+      {% endif %}
+      <span class="proc-time">{{ (item.processed_at or '')[:16] | replace('T', ' ') }}</span>
+    </div>
+    {% endfor %}
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

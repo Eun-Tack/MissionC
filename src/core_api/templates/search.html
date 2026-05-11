@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}검색 · MC{% endblock %}
+
+{% block head %}
+<style>
+  .page { display: grid; grid-template-rows: 56px 1fr; height: 100vh; }
+  .search-input { width: 340px; padding: 8px 12px 8px 32px; border: 1px solid var(--border);
+                  border-radius: 8px; background: var(--surface); font-size: 13px; color: var(--fg);
+                  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
+                  background-repeat: no-repeat; background-position: 10px center; background-size: 14px; }
+
+  .content { overflow-y: auto; padding: 32px 48px; max-width: 800px; margin: 0 auto; width: 100%; }
+  .page-h { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 8px; }
+  .result-count { font-size: 13px; color: var(--muted); margin-bottom: 24px; }
+
+  /* Search form (large, page-center) */
+  .search-form { display: flex; gap: 8px; margin-bottom: 32px; }
+  .search-form input { flex: 1; padding: 12px 16px; font-size: 15px; border: 1px solid var(--border);
+                       border-radius: 10px; background: var(--surface); color: var(--fg); }
+  .search-form input:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px oklch(58% 0.18 280 / 0.1); }
+  .search-form button { padding: 12px 20px; background: var(--brand); color: white;
+                        border: none; border-radius: 10px; font-size: 14px; font-weight: 500; cursor: pointer; }
+  .search-form button:hover { filter: brightness(1.1); }
+
+  /* Results */
+  .result-item { padding: 14px 16px; border-radius: 10px; margin-bottom: 8px;
+                 border: 1px solid var(--border); background: var(--surface);
+                 cursor: pointer; transition: border-color 120ms; }
+  .result-item:hover { border-color: var(--brand-soft); background: var(--bg); }
+  .result-header { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  .result-icon { font-size: 14px; }
+  .result-title { font-size: 14px; font-weight: 500; flex: 1; }
+  .result-status { font-size: 11px; padding: 2px 7px; border-radius: 999px;
+                   background: var(--surface-2); color: var(--muted); font-weight: 500; }
+  .result-snippet { font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .result-snippet mark { background: oklch(95% 0.08 80); color: oklch(35% 0.18 80);
+                         border-radius: 2px; padding: 0 2px; }
+  .result-time { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  .empty-state { text-align: center; color: var(--muted); padding: 64px 0; font-size: 14px; }
+  .empty-icon { font-size: 32px; margin-bottom: 12px; }
+
+  /* Loading indicator */
+  .htmx-indicator { opacity: 0; transition: opacity 200ms; font-size: 13px; color: var(--muted); margin-left: 8px; }
+  .htmx-request .htmx-indicator { opacity: 1; }
+
+  /* Filter bar */
+  .filter-bar {
+    display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; align-items: center;
+  }
+  .filter-chips {
+    display: flex; gap: 4px; flex-wrap: wrap;
+  }
+  .filter-chip {
+    padding: 5px 12px; font-size: 12px; border: 1px solid var(--border);
+    border-radius: 999px; background: var(--surface); color: var(--muted);
+    cursor: pointer; transition: all 100ms; white-space: nowrap; text-decoration: none;
+  }
+  .filter-chip:hover, .filter-chip.active {
+    background: var(--brand-soft); color: var(--brand); border-color: var(--brand);
+  }
+  .filter-select {
+    padding: 5px 10px; font-size: 12px; border: 1px solid var(--border);
+    border-radius: 999px; background: var(--surface); color: var(--muted);
+    cursor: pointer; outline: none;
+  }
+  .filter-select:focus, .filter-select.active { border-color: var(--brand); color: var(--fg); }
+  .filter-date {
+    padding: 5px 10px; font-size: 11px; border: 1px solid var(--border);
+    border-radius: 8px; background: var(--surface); color: var(--fg);
+    font-family: 'JetBrains Mono', monospace; outline: none;
+  }
+  .filter-date:focus { border-color: var(--brand); }
+  .filter-sep { color: var(--border); font-size: 11px; align-self: center; }
+
+  /* Result metadata */
+  .result-meta { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+  .result-tag { font-size: 10px; padding: 2px 7px; border-radius: 999px;
+                background: var(--surface-2); color: var(--muted); }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="page">
+  {% set active_nav = 'search' %}
+  {% include "partials/topbar.html" %}
+
+  <div class="content">
+    <div class="page-h">검색</div>
+
+    <form class="search-form" method="get" action="/search" id="search-form">
+      <input name="q" id="search-q" value="{{ q }}" placeholder="항목 제목, 내용 검색…" autocomplete="off" autofocus
+             hx-get="/partial/search"
+             hx-trigger="input changed delay:300ms"
+             hx-target="#search-results"
+             hx-swap="innerHTML"
+             hx-include="#search-form"
+             hx-indicator="#search-spinner" />
+      <button type="submit">검색</button>
+      <span id="search-spinner" class="htmx-indicator">검색 중…</span>
+    </form>
+
+    <!-- Filter bar -->
+    <div class="filter-bar">
+      <div class="filter-chips">
+        {% set type_opts = [('', '전체'), ('task', '태스크'), ('schedule', '일정'), ('memo', '메모')] %}
+        {% for val, label in type_opts %}
+        <a href="?q={{ q }}&type_filter={{ val }}&status_filter={{ status_filter }}&project_id={{ project_id or '' }}&date_from={{ date_from }}&date_to={{ date_to }}"
+           class="filter-chip {% if type_filter == val %}active{% endif %}">{{ label }}</a>
+        {% endfor %}
+      </div>
+
+      <div class="filter-chips" style="margin-left:8px;">
+        {% set st_opts = [('', '모든 상태'), ('todo', '할 일'), ('doing', '진행중'), ('done', '완료'), ('waiting', '대기')] %}
+        {% for val, label in st_opts %}
+        <a href="?q={{ q }}&type_filter={{ type_filter }}&status_filter={{ val }}&project_id={{ project_id or '' }}&date_from={{ date_from }}&date_to={{ date_to }}"
+           class="filter-chip {% if status_filter == val %}active{% endif %}">{{ label }}</a>
+        {% endfor %}
+      </div>
+
+      {% if projects %}
+      <select class="filter-select {% if project_id %}active{% endif %}"
+              name="project_id" form="search-form"
+              onchange="this.form.submit()">
+        <option value="">전체 프로젝트</option>
+        {% for p in projects %}
+        <option value="{{ p.id }}" {% if project_id == p.id %}selected{% endif %}>{{ p.title }}</option>
+        {% endfor %}
+      </select>
+      {% endif %}
+
+      <span class="filter-sep">날짜</span>
+      <input type="date" name="date_from" form="search-form" value="{{ date_from }}"
+             class="filter-date" onchange="this.form.submit()" title="시작일">
+      <span class="filter-sep">~</span>
+      <input type="date" name="date_to" form="search-form" value="{{ date_to }}"
+             class="filter-date" onchange="this.form.submit()" title="종료일">
+
+      {% if type_filter or status_filter or project_id or date_from or date_to %}
+      <a href="/search?q={{ q }}" style="font-size:12px; color:oklch(60% 0.21 25); text-decoration:none; margin-left:4px;">✕ 필터 초기화</a>
+      {% endif %}
+    </div>
+
+    <!-- Hidden inputs so htmx includes filter values in live search -->
+    <input type="hidden" name="type_filter" value="{{ type_filter }}" form="search-form">
+    <input type="hidden" name="status_filter" value="{{ status_filter }}" form="search-form">
+    <input type="hidden" name="project_id" value="{{ project_id or '' }}" form="search-form">
+    <input type="hidden" name="date_from" value="{{ date_from }}" form="search-form">
+    <input type="hidden" name="date_to" value="{{ date_to }}" form="search-form">
+
+    {% if count > 0 %}
+    <div class="result-count">{{ count }}개 결과{% if q %} — "{{ q }}"{% endif %}</div>
+    {% endif %}
+
+    <div id="search-results">
+      {% include "partials/search_results.html" %}
+    </div>
+  </div>
+</div>
+{% endblock %}

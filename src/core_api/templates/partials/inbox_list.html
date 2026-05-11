@@ -1,0 +1,45 @@
+{% if pending %}
+{% for entry in pending %}
+<div class="inbox-card" id="inbox-{{ entry.id }}">
+  <div class="inbox-source">
+    <span class="src-dot" data-src="{{ entry.source }}"></span>
+    {{ entry.source | upper }}
+    · {{ (entry.received_at or '')[:16] | replace('T', ' ') }}
+  </div>
+  <div class="inbox-text">{{ entry.raw_text }}</div>
+  <div class="inbox-actions">
+    <form class="inbox-accept-form"
+          hx-post="/inbox/{{ entry.id }}/accept"
+          hx-target="#inbox-pending"
+          hx-swap="innerHTML">
+      <input class="inbox-input" name="title" placeholder="{{ entry.raw_text[:60] }}" />
+      <select class="inbox-select" name="type">
+        <option value="task" {% if entry.suggested_type == 'task' %}selected{% endif %}>할 일</option>
+        <option value="memo" {% if entry.suggested_type == 'memo' %}selected{% endif %}>메모</option>
+        <option value="schedule" {% if entry.suggested_type == 'schedule' %}selected{% endif %}>일정</option>
+      </select>
+      {% if projects %}
+      <select class="inbox-select" name="project_id">
+        <option value="">프로젝트 없음</option>
+        {% for p in projects %}
+        <option value="{{ p.id }}">{{ p.org_name }} / {{ p.title }}</option>
+        {% endfor %}
+      </select>
+      {% endif %}
+      <button type="submit" class="btn-accept">수락 →</button>
+    </form>
+    <form hx-post="/inbox/{{ entry.id }}/reject"
+          hx-target="#inbox-pending"
+          hx-swap="innerHTML"
+          style="display:contents;">
+      <button type="submit" class="btn-reject">거절</button>
+    </form>
+  </div>
+</div>
+{% endfor %}
+{% else %}
+<div class="empty-state">
+  <div class="empty-icon">📭</div>
+  처리 대기 중인 항목이 없습니다
+</div>
+{% endif %}

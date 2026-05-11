@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>SC-13 Calendar · MC</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css">
+<style>
+  :root {
+    --bg: oklch(99% 0.005 270); --fg: oklch(20% 0.02 270);
+    --muted: oklch(55% 0.015 270); --border: oklch(92% 0.01 270);
+    --surface: oklch(98% 0.005 270); --surface-2: oklch(96% 0.008 270);
+    --brand: oklch(58% 0.18 280); --brand-soft: oklch(95% 0.04 280);
+    --accent: oklch(70% 0.15 200); --gcal: oklch(55% 0.20 250);
+    --st-doing: oklch(60% 0.18 240); --st-done: oklch(60% 0.16 145);
+    --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: oklch(15% 0.01 270); --fg: oklch(94% 0.005 270);
+      --muted: oklch(65% 0.015 270); --border: oklch(28% 0.015 270);
+      --surface: oklch(20% 0.01 270); --surface-2: oklch(24% 0.012 270);
+      --brand-soft: oklch(28% 0.06 280);
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; font-family: 'Pretendard Variable', system-ui, sans-serif;
+               background: var(--bg); color: var(--fg); }
+
+  .app { display: grid; grid-template-rows: 56px 48px 1fr;
+         grid-template-columns: 1fr 280px; height: 100vh;
+         grid-template-areas: "topbar topbar" "filterbar filterbar" "main aside"; }
+
+  .topbar { grid-area: topbar; border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; padding: 0 20px; gap: 16px; }
+  .logo { font-weight: 800; font-size: 18px; color: var(--brand); }
+  .nav-tabs { display: flex; gap: 4px; }
+  .nav-tabs button { padding: 6px 14px; font-size: 13px; font-weight: 500; border: none;
+                     background: transparent; color: var(--muted); border-radius: 8px; cursor: pointer; }
+  .nav-tabs button.active { color: var(--fg); background: var(--surface-2); }
+
+  .filterbar { grid-area: filterbar; padding: 0 20px; border-bottom: 1px solid var(--border);
+               display: flex; align-items: center; gap: 12px; background: var(--surface); }
+  .mode-toggle { display: inline-flex; background: var(--surface-2); padding: 2px;
+                 border-radius: 8px; gap: 2px; }
+  .mode-toggle button { padding: 4px 12px; font-size: 12px; font-weight: 500; border: none;
+                        background: transparent; color: var(--muted); border-radius: 6px;
+                        cursor: pointer; transition: all 120ms; }
+  .mode-toggle button.active { background: var(--bg); color: var(--fg);
+                               box-shadow: 0 1px 2px oklch(0% 0 0 / 0.04); }
+  .week-nav { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .week-nav button { width: 28px; height: 28px; border: 1px solid var(--border);
+                     background: var(--bg); border-radius: 6px; cursor: pointer; }
+  .filter-chip { padding: 4px 10px; font-size: 11px; border: 1px solid var(--border);
+                 border-radius: 999px; background: var(--bg); cursor: pointer;
+                 display: inline-flex; align-items: center; gap: 4px; }
+  .filter-chip.active { background: var(--brand-soft); color: var(--brand); border-color: var(--brand); }
+  .filterbar .spacer { flex: 1; }
+
+  /* === WEEK VIEW === */
+  .main { grid-area: main; overflow: hidden; position: relative; display: flex; flex-direction: column; }
+  .week-grid { display: grid; grid-template-columns: 60px repeat(7, 1fr); flex: 1; overflow: hidden; }
+  .day-h { padding: 12px 8px; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border);
+           background: var(--surface); position: sticky; top: 0; z-index: 2; text-align: center; }
+  .day-h.today { background: var(--brand-soft); color: var(--brand); }
+  .day-h:first-child { background: var(--surface); }
+  .day-name { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .day-num { font-size: 16px; font-weight: 600; margin-top: 2px; }
+  .day-h.today .day-num { color: var(--brand); }
+
+  .scroll-area { display: contents; overflow-y: auto; }
+  .hours-col { background: var(--surface); border-right: 1px solid var(--border);
+               position: relative; }
+  .hour-label { height: 56px; padding-right: 8px; font-size: 11px; color: var(--muted);
+                font-family: 'JetBrains Mono', monospace; text-align: right;
+                line-height: 1; padding-top: 4px; }
+  .day-col { border-right: 1px solid var(--border); position: relative;
+             background-image: linear-gradient(to bottom, var(--border) 1px, transparent 1px);
+             background-size: 100% 56px; }
+
+  /* Now indicator — pulsing line at current time */
+  .now-line { position: absolute; left: 0; right: 0; height: 2px;
+              background: var(--accent); z-index: 5; pointer-events: none; }
+  .now-line::before {
+    content: ''; position: absolute; left: -4px; top: -3px;
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent);
+    animation: now-pulse 2s ease-in-out infinite;
+  }
+  @keyframes now-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 oklch(70% 0.15 200 / 0.5); }
+    50%      { box-shadow: 0 0 0 8px oklch(70% 0.15 200 / 0); }
+  }
+
+  /* Event blocks */
+  .event {
+    position: absolute; left: 4px; right: 4px;
+    padding: 6px 8px; border-radius: 6px;
+    font-size: 11px; line-height: 1.3;
+    cursor: grab; user-select: none;
+    border-left: 3px solid;
+    background: var(--surface);
+    transition: transform 120ms var(--ease), box-shadow 120ms var(--ease);
+    overflow: hidden;
+  }
+  .event:hover { transform: translateX(2px);
+                 box-shadow: 2px 4px 12px oklch(0% 0 0 / 0.08); }
+  .event:active { cursor: grabbing; }
+  .event.dragging { opacity: 0.6; transform: scale(0.95); }
+
+  .event-time { font-family: 'JetBrains Mono', monospace; font-size: 10px;
+                color: var(--muted); margin-bottom: 1px; }
+  .event-title { font-weight: 500; }
+  .event-meta { display: flex; gap: 4px; margin-top: 3px; flex-wrap: wrap; }
+
+  /* Event styling per project */
+  .event[data-proj="mc-dev"]   { border-left-color: var(--brand); background: var(--brand-soft); }
+  .event[data-proj="bohun"]    { border-left-color: oklch(65% 0.15 30); background: oklch(96% 0.04 30); }
+  .event[data-proj="odc"]      { border-left-color: oklch(60% 0.15 145); background: oklch(96% 0.04 145); }
+  .event[data-proj="gcal"]     { border-left-color: var(--gcal); background: oklch(96% 0.03 250); }
+
+  .gcal-mini { font-size: 9px; padding: 0 4px; color: var(--gcal);
+               background: oklch(94% 0.04 250); border-radius: 3px; font-weight: 500; }
+  .label-mini { font-size: 9px; padding: 0 5px; border-radius: 999px; }
+  .label-mini[data-type="block"] { background: oklch(94% 0.06 25); color: oklch(40% 0.21 25); }
+  .label-mini[data-type="important"] { background: oklch(94% 0.06 50); color: oklch(40% 0.18 50); }
+
+  /* Density heatmap on day header (subtle innovation) */
+  .density-bar { height: 3px; background: var(--brand); border-radius: 999px;
+                 margin-top: 6px; opacity: 0.3; }
+
+  /* === ASIDE: Unscheduled === */
+  .aside { grid-area: aside; border-left: 1px solid var(--border); background: var(--surface);
+           padding: 16px; overflow-y: auto; }
+  .aside-h { font-size: 11px; font-weight: 600; text-transform: uppercase;
+             letter-spacing: 0.05em; color: var(--muted); margin-bottom: 8px; }
+  .aside-hint { font-size: 11px; color: var(--muted); margin-bottom: 12px;
+                padding: 8px 10px; background: var(--bg); border-radius: 6px;
+                border: 1px dashed var(--border); }
+  .unscheduled-item {
+    padding: 10px 12px; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; margin-bottom: 6px; cursor: grab;
+    font-size: 12px; transition: all 120ms;
+  }
+  .unscheduled-item:hover { border-color: var(--brand); transform: translateX(-2px); }
+
+  /* === MONTH VIEW === */
+  .month-grid { display: none; flex: 1; grid-template-columns: repeat(7, 1fr);
+                grid-template-rows: 32px repeat(5, 1fr); }
+  .month-day-h { padding: 6px; font-size: 11px; color: var(--muted); text-align: center;
+                 border-bottom: 1px solid var(--border); background: var(--surface); }
+  .month-cell { border-right: 1px solid var(--border); border-bottom: 1px solid var(--border);
+                padding: 6px; font-size: 11px; min-height: 80px; cursor: pointer;
+                transition: background 120ms; }
+  .month-cell:hover { background: var(--surface-2); }
+  .month-cell.today .day-num-m { color: var(--brand); font-weight: 700; }
+  .month-cell.outside { color: var(--muted); opacity: 0.4; }
+  .day-num-m { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+  .month-event { font-size: 10px; padding: 1px 4px; border-radius: 3px;
+                 margin-bottom: 2px; overflow: hidden; white-space: nowrap;
+                 text-overflow: ellipsis; line-height: 1.4; }
+  .month-event[data-proj="mc-dev"]  { background: var(--brand-soft); color: var(--brand); }
+  .month-event[data-proj="bohun"]   { background: oklch(96% 0.04 30); color: oklch(45% 0.15 30); }
+  .month-event[data-proj="gcal"]    { background: oklch(96% 0.03 250); color: var(--gcal); }
+  .month-more { font-size: 10px; color: var(--muted); padding-left: 4px; }
+
+  body[data-mode="month"] .week-grid { display: none; }
+  body[data-mode="month"] .month-grid { display: grid; }
+
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+</style>
+</head>
+<body data-mode="week">
+
+<div class="app">
+
+  <div class="topbar">
+    <span class="logo">MC</span>
+    <div class="nav-tabs">
+      <button>Flow</button>
+      <button class="active">Calendar</button>
+      <button>Hierarchy</button>
+    </div>
+    <div style="flex: 1;"></div>
+    <button style="background: transparent; border: none; cursor: pointer; color: var(--muted);">⚙</button>
+  </div>
+
+  <div class="filterbar">
+    <div class="mode-toggle">
+      <button data-mode="day">일</button>
+      <button data-mode="week" class="active">주</button>
+      <button data-mode="month">월</button>
+    </div>
+    <div class="week-nav">
+      <button>‹</button>
+      <span style="font-weight: 600;">2026년 5월 4일 ~ 10일</span>
+      <button>›</button>
+      <button style="width: auto; padding: 0 10px;">오늘</button>
+    </div>
+    <div style="flex: 1;"></div>
+    <span style="font-size: 11px; color: var(--muted);">필터:</span>
+    <button class="filter-chip active">🏢 플링크데이터</button>
+    <button class="filter-chip">🏛 보훈진흥원</button>
+    <button class="filter-chip"><span class="gcal-mini">🗓 GCal</span></button>
+    <button class="filter-chip">🔴 블로킹</button>
+  </div>
+
+  <!-- === MAIN: WEEK VIEW === -->
+  <div class="main">
+    <div class="week-grid">
+      <!-- Day headers row (8 cells: corner + 7 days) -->
+      <div class="day-h"></div>
+      <div class="day-h"><div class="day-name">월</div><div class="day-num">4</div><div class="density-bar" style="opacity: 0.6;"></div></div>
+      <div class="day-h"><div class="day-name">화</div><div class="day-num">5</div><div class="density-bar" style="opacity: 0.4;"></div></div>
+      <div class="day-h today"><div class="day-name">수 · 오늘</div><div class="day-num">6</div><div class="density-bar" style="opacity: 0.9;"></div></div>
+      <div class="day-h"><div class="day-name">목</div><div class="day-num">7</div><div class="density-bar" style="opacity: 0.3;"></div></div>
+      <div class="day-h"><div class="day-name">금</div><div class="day-num">8</div><div class="density-bar" style="opacity: 0.5;"></div></div>
+      <div class="day-h"><div class="day-name">토</div><div class="day-num">9</div><div class="density-bar" style="opacity: 0.1;"></div></div>
+      <div class="day-h"><div class="day-name">일</div><div class="day-num">10</div></div>
+
+      <!-- Hours column -->
+      <div class="hours-col" style="grid-row: 2 / 18;">
+        <div class="hour-label" style="margin-top: 56px;">08</div>
+        <div class="hour-label">09</div>
+        <div class="hour-label">10</div>
+        <div class="hour-label">11</div>
+        <div class="hour-label">12</div>
+        <div class="hour-label">13</div>
+        <div class="hour-label">14</div>
+        <div class="hour-label">15</div>
+        <div class="hour-label">16</div>
+        <div class="hour-label">17</div>
+        <div class="hour-label">18</div>
+        <div class="hour-label">19</div>
+      </div>
+
+      <!-- Day columns (7 cols × 1 row each, full height) -->
+      <!-- 월 -->
+      <div class="day-col" style="height: 800px;">
+        <div class="event" data-proj="bohun" style="top: 56px; height: 56px;">
+          <div class="event-time">09:00 ~ 10:00</div>
+          <div class="event-title">Q2 리뷰 기획 회의</div>
+        </div>
+        <div class="event" data-proj="mc-dev" style="top: 224px; height: 84px;">
+          <div class="event-time">12:00 ~ 13:30</div>
+          <div class="event-title">설계 검토</div>
+        </div>
+      </div>
+      <!-- 화 -->
+      <div class="day-col" style="height: 800px;">
+        <div class="event" data-proj="gcal" style="top: 112px; height: 56px;">
+          <div class="event-time">10:00 ~ 11:00</div>
+          <div class="event-title">팀 스탠드업</div>
+          <div class="event-meta"><span class="gcal-mini">🗓 GCal</span></div>
+        </div>
+      </div>
+      <!-- 수 (today) -->
+      <div class="day-col" style="height: 800px; background: oklch(99% 0.01 280 / 0.4);">
+        <div class="now-line" style="top: 480px;"></div>
+        <div class="event" data-proj="gcal" style="top: 56px; height: 56px;">
+          <div class="event-time">09:00 ~ 09:30</div>
+          <div class="event-title">팀 스탠드업</div>
+          <div class="event-meta"><span class="gcal-mini">🗓 GCal</span></div>
+        </div>
+        <div class="event" data-proj="bohun" style="top: 112px; height: 56px;">
+          <div class="event-time">10:00 ~ 11:00 · doing</div>
+          <div class="event-title">투자자 미팅</div>
+          <div class="event-meta"><span class="label-mini" data-type="important">중요</span></div>
+        </div>
+        <div class="event" data-proj="mc-dev" style="top: 168px; height: 56px;">
+          <div class="event-time">11:00 ~ 12:00</div>
+          <div class="event-title">PR #42 리뷰</div>
+          <div class="event-meta"><span class="label-mini" data-type="block">블로킹</span></div>
+        </div>
+        <div class="event" data-proj="mc-dev" style="top: 392px; height: 84px;">
+          <div class="event-time">15:30 ~ 17:00</div>
+          <div class="event-title">설계 리뷰</div>
+        </div>
+        <div class="event" data-proj="gcal" style="top: 504px; height: 56px;">
+          <div class="event-time">17:00 ~ 18:00</div>
+          <div class="event-title">1on1 — 김OO</div>
+          <div class="event-meta"><span class="gcal-mini">🗓 GCal</span></div>
+        </div>
+      </div>
+      <!-- 목 -->
+      <div class="day-col" style="height: 800px;">
+        <div class="event" data-proj="bohun" style="top: 168px; height: 56px;">
+          <div class="event-time">11:00 ~ 12:00</div>
+          <div class="event-title">자료 마감</div>
+        </div>
+      </div>
+      <!-- 금 -->
+      <div class="day-col" style="height: 800px;">
+        <div class="event" data-proj="mc-dev" style="top: 84px; height: 84px;">
+          <div class="event-time">09:30 ~ 11:00</div>
+          <div class="event-title">스프린트 리뷰</div>
+        </div>
+        <div class="event" data-proj="odc" style="top: 280px; height: 56px;">
+          <div class="event-time">13:00 ~ 14:00</div>
+          <div class="event-title">ODC 기획 미팅</div>
+        </div>
+      </div>
+      <!-- 토 -->
+      <div class="day-col" style="height: 800px;"></div>
+      <!-- 일 -->
+      <div class="day-col" style="height: 800px;"></div>
+    </div>
+
+    <!-- === MONTH VIEW === -->
+    <div class="month-grid">
+      <div class="month-day-h">월</div><div class="month-day-h">화</div>
+      <div class="month-day-h">수</div><div class="month-day-h">목</div>
+      <div class="month-day-h">금</div><div class="month-day-h">토</div>
+      <div class="month-day-h">일</div>
+
+      <div class="month-cell outside"><div class="day-num-m">27</div></div>
+      <div class="month-cell outside"><div class="day-num-m">28</div></div>
+      <div class="month-cell outside"><div class="day-num-m">29</div></div>
+      <div class="month-cell outside"><div class="day-num-m">30</div></div>
+      <div class="month-cell"><div class="day-num-m">1</div>
+        <div class="month-event" data-proj="mc-dev">★ 09 킥오프</div></div>
+      <div class="month-cell"><div class="day-num-m">2</div></div>
+      <div class="month-cell"><div class="day-num-m">3</div></div>
+
+      <div class="month-cell"><div class="day-num-m">4</div>
+        <div class="month-event" data-proj="bohun">★ 09 Q2 리뷰</div>
+        <div class="month-event" data-proj="mc-dev">★ 12 설계</div></div>
+      <div class="month-cell"><div class="day-num-m">5</div>
+        <div class="month-event" data-proj="gcal">🗓 10 스탠드업</div></div>
+      <div class="month-cell today"><div class="day-num-m">6</div>
+        <div class="month-event" data-proj="gcal">🗓 09 스탠드업</div>
+        <div class="month-event" data-proj="bohun">★ 10 투자자</div>
+        <div class="month-event" data-proj="mc-dev">☐ 11 PR</div>
+        <div class="month-more">+ 2개 더</div></div>
+      <div class="month-cell"><div class="day-num-m">7</div>
+        <div class="month-event" data-proj="bohun">⏰ 11 자료 마감</div></div>
+      <div class="month-cell"><div class="day-num-m">8</div>
+        <div class="month-event" data-proj="mc-dev">★ 09:30 스프린트</div>
+        <div class="month-event" data-proj="odc">★ 13 ODC</div></div>
+      <div class="month-cell"><div class="day-num-m">9</div></div>
+      <div class="month-cell"><div class="day-num-m">10</div></div>
+
+      <div class="month-cell"><div class="day-num-m">11</div></div>
+      <div class="month-cell"><div class="day-num-m">12</div></div>
+      <div class="month-cell"><div class="day-num-m">13</div>
+        <div class="month-event" data-proj="mc-dev">★ 14 리뷰</div></div>
+      <div class="month-cell"><div class="day-num-m">14</div></div>
+      <div class="month-cell"><div class="day-num-m">15</div>
+        <div class="month-event" data-proj="bohun">⏰ 마감</div></div>
+      <div class="month-cell"><div class="day-num-m">16</div></div>
+      <div class="month-cell"><div class="day-num-m">17</div></div>
+
+      <div class="month-cell"><div class="day-num-m">18</div></div>
+      <div class="month-cell"><div class="day-num-m">19</div></div>
+      <div class="month-cell"><div class="day-num-m">20</div></div>
+      <div class="month-cell"><div class="day-num-m">21</div></div>
+      <div class="month-cell"><div class="day-num-m">22</div></div>
+      <div class="month-cell"><div class="day-num-m">23</div></div>
+      <div class="month-cell"><div class="day-num-m">24</div></div>
+
+      <div class="month-cell"><div class="day-num-m">25</div></div>
+      <div class="month-cell"><div class="day-num-m">26</div></div>
+      <div class="month-cell"><div class="day-num-m">27</div></div>
+      <div class="month-cell"><div class="day-num-m">28</div></div>
+      <div class="month-cell"><div class="day-num-m">29</div></div>
+      <div class="month-cell"><div class="day-num-m">30</div></div>
+      <div class="month-cell"><div class="day-num-m">31</div></div>
+    </div>
+  </div>
+
+  <!-- === ASIDE: Unscheduled === -->
+  <div class="aside">
+    <div class="aside-h">미배정 ({3})</div>
+    <div class="aside-hint">
+      이 카드를 캘린더로 드래그하면 자동 일정 등록 (FR-CAL-01)
+    </div>
+    <div class="unscheduled-item" draggable="true">
+      <div style="font-weight: 500; margin-bottom: 2px;">☐ GitHub 이슈 #38 확인</div>
+      <div style="color: var(--muted); font-size: 10px;">#mc-dev · 추정 30분</div>
+    </div>
+    <div class="unscheduled-item" draggable="true">
+      <div style="font-weight: 500; margin-bottom: 2px;">📝 V1.1 아이디어 정리</div>
+      <div style="color: var(--muted); font-size: 10px;">#아이디어 · 라벨: 확인 필요</div>
+    </div>
+    <div class="unscheduled-item" draggable="true">
+      <div style="font-weight: 500; margin-bottom: 2px;">☐ 보훈 보고서 검토</div>
+      <div style="color: var(--muted); font-size: 10px;">#보훈진흥원 · 추정 1시간</div>
+    </div>
+
+    <div class="aside-h" style="margin-top: 24px;">이 주의 통계</div>
+    <div style="font-size: 12px; line-height: 1.8; color: var(--muted);">
+      <div>📅 일정 8 · ☐ 태스크 5 · 📝 메모 3</div>
+      <div>밀도 ████████░░ 78%</div>
+      <div>🗓 GCal 동기 4건 · MC 자체 12건</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // Mode toggle (week ↔ month)
+  document.querySelectorAll('.mode-toggle button').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('.mode-toggle button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.body.dataset.mode = btn.dataset.mode;
+    };
+  });
+
+  // Drag-to-reschedule (간이 데모 — Phase 5에서 정식 구현)
+  let dragging = null;
+  document.querySelectorAll('.event').forEach(ev => {
+    ev.addEventListener('pointerdown', e => {
+      dragging = ev;
+      ev.classList.add('dragging');
+      ev.setPointerCapture(e.pointerId);
+    });
+    ev.addEventListener('pointermove', e => {
+      if (dragging !== ev) return;
+      const dy = e.movementY;
+      ev.style.top = (parseInt(ev.style.top) + dy) + 'px';
+    });
+    ev.addEventListener('pointerup', e => {
+      if (!dragging) return;
+      dragging.classList.remove('dragging');
+      // Snap to 30-min grid
+      const top = parseInt(dragging.style.top);
+      dragging.style.top = (Math.round(top / 28) * 28) + 'px';
+      dragging = null;
+    });
+  });
+</script>
+
+</body>
+</html>

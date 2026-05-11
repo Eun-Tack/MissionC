@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Virtualenv
+venv/
+.venv/
+env/
+
+# Secrets — never commit
+.env
+.env.local
+
+# DB & local data (Railway uses /data volume mount)
+data/
+*.db
+*.sqlite
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test cache
+.pytest_cache/
+.coverage
+htmlcov/
+
+# AI model cache (large binaries — download on demand)
+.whisper_cache/
+
+# Claude Code settings (local only)
+.claude/

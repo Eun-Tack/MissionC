@@ -1,0 +1,105 @@
+{# Attendees partial — loaded via hx-get="/api/items/{id}/contacts/partial" #}
+<div id="att-pills-{{ item_id }}">
+  {% for c in contacts %}
+  {% set color_idx = c.id % 6 %}
+  {% set colors = ['oklch(55% 0.18 280)','oklch(55% 0.18 160)','oklch(55% 0.18 40)','oklch(55% 0.18 20)','oklch(55% 0.18 200)','oklch(55% 0.18 320)'] %}
+  <span class="attendee-pill" id="att-{{ item_id }}-{{ c.id }}">
+    <span class="att-av" style="background:{{ colors[color_idx] }}">{{ c.name[0]|upper }}</span>
+    {{ c.name }}
+    <span class="att-x"
+          hx-delete="/api/items/{{ item_id }}/contacts/{{ c.id }}"
+          hx-target="closest .attendee-pill"
+          hx-swap="outerHTML">×</span>
+  </span>
+  {% endfor %}
+</div>
+
+<div class="att-add">
+  <input type="text"
+         id="att-inp-{{ item_id }}"
+         placeholder="이름 검색 또는 새 이름..."
+         autocomplete="off"
+         oninput="attSearch({{ item_id }}, this.value)"
+         onkeydown="attKeydown(event, {{ item_id }})">
+  <div class="att-dropdown" id="att-dd-{{ item_id }}"></div>
+</div>
+
+<script>
+(function() {
+  const itemId = {{ item_id }};
+  let _allContacts = {{ all_contacts | tojson }};
+  let _searchTimer = null;
+
+  window.attSearch = function(id, q) {
+    if (id !== itemId) return;
+    clearTimeout(_searchTimer);
+    _searchTimer = setTimeout(() => _renderDd(id, q), 150);
+  };
+
+  function _renderDd(id, q) {
+    const dd = document.getElementById('att-dd-' + id);
+    if (!dd) return;
+    const q_lower = q.toLowerCase();
+    const filtered = q
+      ? _allContacts.filter(c => c.name.toLowerCase().includes(q_lower) || (c.org||'').toLowerCase().includes(q_lower))
+      : _allContacts.slice(0, 10);
+    if (!filtered.length && !q) { dd.classList.remove('open'); return; }
+    const rows = filtered.map(c =>
+      `<div class="att-opt" onclick="attPick(${id}, ${c.id}, '')">
+        <span>${c.name}</span>
+        ${c.org ? `<span class="att-opt-sub">${c.org}</span>` : ''}
+      </div>`
+    ).join('');
+    const createRow = q ? `<div class="att-opt" style="font-style:italic;" onclick="attCreate(${id}, '${q.replace(/'/g,"\\'")}')">+ "${q}" 새로 추가</div>` : '';
+    dd.innerHTML = rows + createRow;
+    dd.classList.toggle('open', !!(rows || createRow));
+  }
+
+  window.attKeydown = function(e, id) {
+    if (e.key === 'Enter') {
+      const inp = document.getElementById('att-inp-' + id);
+      const q = inp?.value.trim();
+      if (q) { attCreate(id, q); }
+      e.preventDefault();
+    }
+    if (e.key === 'Escape') {
+      document.getElementById('att-dd-' + id)?.classList.remove('open');
+    }
+  };
+
+  window.attPick = async function(id, contactId, _name) {
+    const fd = new FormData();
+    fd.append('contact_id', contactId);
+    const res = await fetch('/api/items/' + id + '/contacts', {method: 'POST', body: fd});
+    const html = await res.text();
+    const pills = document.getElementById('att-pills-' + id);
+    if (pills) pills.insertAdjacentHTML('beforeend', html);
+    const inp = document.getElementById('att-inp-' + id);
+    if (inp) inp.value = '';
+    document.getElementById('att-dd-' + id)?.classList.remove('open');
+    htmx.process(document.getElementById('att-pills-' + id));
+  };
+
+  window.attCreate = async function(id, name) {
+    const fd = new FormData();
+    fd.append('name', name);
+    const res = await fetch('/api/items/' + id + '/contacts', {method: 'POST', body: fd});
+    const html = await res.text();
+    const pills = document.getElementById('att-pills-' + id);
+    if (pills) pills.insertAdjacentHTML('beforeend', html);
+    // Also add to local list for future searches
+    _allContacts.push({id: Date.now(), name, org: ''});
+    const inp = document.getElementById('att-inp-' + id);
+    if (inp) inp.value = '';
+    document.getElementById('att-dd-' + id)?.classList.remove('open');
+    htmx.process(document.getElementById('att-pills-' + id));
+  };
+
+  // Close dropdown on outside click
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.att-add')) {
+      document.getElementById('att-dd-' + itemId)?.classList.remove('open');
+    }
+  }, true);
+})();
+</script>

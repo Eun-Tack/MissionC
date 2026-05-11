@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>SC-14 Hierarchy · MC</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css">
+<style>
+  :root {
+    --bg: oklch(99% 0.005 270); --fg: oklch(20% 0.02 270);
+    --muted: oklch(55% 0.015 270); --border: oklch(92% 0.01 270);
+    --surface: oklch(98% 0.005 270); --surface-2: oklch(96% 0.008 270);
+    --brand: oklch(58% 0.18 280); --brand-soft: oklch(95% 0.04 280);
+    --accent: oklch(70% 0.15 200);
+    --st-todo: oklch(60% 0.02 270); --st-doing: oklch(60% 0.18 240);
+    --st-done: oklch(60% 0.16 145); --st-paused: oklch(65% 0.05 270);
+    --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: oklch(15% 0.01 270); --fg: oklch(94% 0.005 270);
+      --muted: oklch(65% 0.015 270); --border: oklch(28% 0.015 270);
+      --surface: oklch(20% 0.01 270); --surface-2: oklch(24% 0.012 270);
+      --brand-soft: oklch(28% 0.06 280);
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { font-family: 'Pretendard Variable', system-ui, sans-serif;
+               background: var(--bg); color: var(--fg); }
+
+  .topbar { height: 56px; border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; padding: 0 20px; gap: 16px; }
+  .logo { font-weight: 800; font-size: 18px; color: var(--brand); }
+  .nav { display: flex; gap: 4px; margin-left: 8px; }
+  .nav button { padding: 6px 14px; font-size: 13px; font-weight: 500; border: none;
+                background: transparent; color: var(--muted); border-radius: 8px; cursor: pointer; }
+  .nav button.active { color: var(--fg); background: var(--surface-2); }
+
+  .container { max-width: 1280px; margin: 0 auto; padding: 32px; }
+
+  /* Page Header */
+  .page-h { display: flex; align-items: end; justify-content: space-between; margin-bottom: 32px; }
+  .page-title { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
+  .page-meta { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .page-actions { display: flex; gap: 8px; }
+  .btn { padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 500;
+         border: 1px solid var(--border); background: var(--surface); cursor: pointer;
+         transition: all 120ms; }
+  .btn:hover { background: var(--surface-2); }
+  .btn-primary { background: var(--brand); color: white; border-color: var(--brand); }
+
+  /* Filter bar */
+  .filterbar { display: flex; gap: 8px; align-items: center; padding: 12px 0;
+               border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+               margin-bottom: 24px; flex-wrap: wrap; }
+  .filter-chip { padding: 4px 10px; font-size: 11px; border: 1px solid var(--border);
+                 border-radius: 999px; background: var(--surface); cursor: pointer;
+                 display: inline-flex; align-items: center; gap: 4px; }
+  .filter-chip.active { background: var(--brand-soft); color: var(--brand); border-color: var(--brand); }
+
+  /* Org Section */
+  .org-section { margin-bottom: 48px; }
+  .org-header {
+    display: flex; align-items: center; gap: 16px;
+    padding: 16px 20px; background: linear-gradient(90deg, var(--surface) 0%, transparent 100%);
+    border-radius: 16px; border: 1px solid var(--border);
+    border-left-width: 4px;
+    margin-bottom: 16px;
+    position: relative;
+  }
+  .org-logo {
+    width: 56px; height: 56px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; font-weight: 800; color: white;
+    box-shadow: 0 4px 16px oklch(0% 0 0 / 0.08);
+    flex-shrink: 0;
+  }
+  .org-info { flex: 1; }
+  .org-name { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
+  .org-stats { display: flex; gap: 16px; margin-top: 4px; font-size: 12px; color: var(--muted); }
+  .org-stat strong { color: var(--fg); font-weight: 600; }
+  .org-progress {
+    width: 200px; height: 6px; background: var(--surface-2); border-radius: 999px;
+    overflow: hidden; margin-top: 8px;
+  }
+  .org-progress-fill {
+    height: 100%; border-radius: 999px;
+    background: linear-gradient(90deg, var(--brand), var(--accent));
+    transition: width 480ms var(--ease);
+  }
+
+  /* Business Section */
+  .business {
+    margin-left: 24px; margin-bottom: 24px;
+    border-left: 1px dashed var(--border); padding-left: 24px;
+    position: relative;
+  }
+  .business::before {
+    content: ''; position: absolute; left: -1px; top: 18px;
+    width: 16px; height: 1px; background: var(--border);
+  }
+  .business-h {
+    display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px;
+    cursor: pointer;
+  }
+  .business-name { font-size: 14px; font-weight: 600; }
+  .business-count { font-size: 11px; color: var(--muted);
+                    padding: 1px 8px; background: var(--surface-2); border-radius: 999px; }
+  .business-desc { font-size: 12px; color: var(--muted); }
+
+  /* Project Cards */
+  .project-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px; margin-top: 8px;
+  }
+  .project-card {
+    padding: 16px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; cursor: pointer;
+    transition: all 240ms var(--ease);
+    position: relative; overflow: hidden;
+  }
+  .project-card::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+    background: var(--brand); opacity: 0;
+    transition: opacity 240ms var(--ease);
+  }
+  .project-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px oklch(0% 0 0 / 0.06);
+    border-color: var(--brand);
+  }
+  .project-card:hover::before { opacity: 1; }
+  .project-card[data-status="active"]::before  { background: var(--st-doing); opacity: 1; }
+  .project-card[data-status="done"]::before    { background: var(--st-done); opacity: 1; }
+  .project-card[data-status="paused"]::before  { background: var(--st-paused); opacity: 1; }
+  .project-card[data-status="planning"]::before{ background: var(--accent); opacity: 1; }
+
+  .project-h { display: flex; align-items: start; justify-content: space-between; gap: 8px; }
+  .project-name { font-size: 15px; font-weight: 600; line-height: 1.3; }
+  .project-status {
+    font-size: 10px; padding: 2px 6px; border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace; text-transform: uppercase;
+    letter-spacing: 0.05em;
+    flex-shrink: 0;
+  }
+  .project-status[data-s="active"]   { background: oklch(94% 0.06 240); color: var(--st-doing); }
+  .project-status[data-s="done"]     { background: oklch(94% 0.06 145); color: var(--st-done); }
+  .project-status[data-s="planning"] { background: oklch(94% 0.05 200); color: var(--accent); }
+  .project-status[data-s="paused"]   { background: var(--surface-2); color: var(--muted); }
+
+  .project-dates { font-size: 11px; color: var(--muted); margin: 8px 0;
+                   font-family: 'JetBrains Mono', monospace; }
+  .project-progress { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+  .project-bar { flex: 1; height: 5px; background: var(--surface-2);
+                 border-radius: 999px; overflow: hidden; }
+  .project-bar-fill {
+    height: 100%; border-radius: 999px;
+    background: linear-gradient(90deg, var(--brand), var(--accent));
+  }
+  .project-percent { font-size: 11px; font-weight: 600;
+                     font-family: 'JetBrains Mono', monospace; min-width: 36px; text-align: right; }
+
+  .project-meta { display: flex; gap: 12px; margin-top: 12px;
+                  font-size: 11px; color: var(--muted); }
+  .project-meta span { display: inline-flex; align-items: center; gap: 4px; }
+
+  /* Stage chips inline */
+  .stage-chips { display: flex; gap: 4px; margin-top: 10px; flex-wrap: wrap; }
+  .stage-chip {
+    font-size: 10px; padding: 2px 8px; border-radius: 999px;
+    background: var(--surface-2); color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .stage-chip[data-s="done"]    { background: oklch(94% 0.06 145); color: oklch(45% 0.16 145); }
+  .stage-chip[data-s="active"]  { background: oklch(94% 0.06 240); color: var(--st-doing);
+                                  position: relative; }
+  .stage-chip[data-s="active"]::after {
+    content: ''; position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+    width: 4px; height: 4px; border-radius: 50%; background: var(--st-doing);
+    animation: chip-pulse 2s ease-in-out infinite;
+  }
+  @keyframes chip-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 oklch(60% 0.18 240 / 0.5); }
+    50%      { box-shadow: 0 0 0 4px oklch(60% 0.18 240 / 0); }
+  }
+
+  /* 무소속 */
+  .unowned {
+    background: var(--surface-2);
+    padding: 24px; border-radius: 16px;
+    border: 1px dashed var(--border);
+  }
+  .unowned-h { font-weight: 600; margin-bottom: 8px; color: var(--muted); }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="logo">MC</span>
+  <div class="nav">
+    <button>Flow</button>
+    <button>Calendar</button>
+    <button class="active">Hierarchy</button>
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="page-h">
+    <div>
+      <h1 class="page-title">소속 · 사업 · 프로젝트</h1>
+      <div class="page-meta">전체 3 소속 · 5 사업 · 12 프로젝트 · 78 항목</div>
+    </div>
+    <div class="page-actions">
+      <button class="btn">+ 사업 추가</button>
+      <button class="btn btn-primary">+ 프로젝트 추가</button>
+    </div>
+  </div>
+
+  <div class="filterbar">
+    <span style="font-size: 11px; color: var(--muted);">상태:</span>
+    <button class="filter-chip active">전체 12</button>
+    <button class="filter-chip">진행중 5</button>
+    <button class="filter-chip">기획 3</button>
+    <button class="filter-chip">검토 2</button>
+    <button class="filter-chip">완료 2</button>
+    <span style="margin-left: 16px; font-size: 11px; color: var(--muted);">정렬:</span>
+    <button class="filter-chip">마감일 ↑</button>
+    <button class="filter-chip">진척도 ↓</button>
+  </div>
+
+  <!-- Plinkdata -->
+  <section class="org-section">
+    <div class="org-header" style="border-left-color: var(--brand);">
+      <div class="org-logo" style="background: linear-gradient(135deg, var(--brand), oklch(50% 0.18 280));">P</div>
+      <div class="org-info">
+        <div class="org-name">플링크데이터</div>
+        <div class="org-stats">
+          <span class="org-stat"><strong>2</strong> 사업</span>
+          <span class="org-stat"><strong>5</strong> 프로젝트</span>
+          <span class="org-stat"><strong>42</strong> 항목</span>
+          <span class="org-stat" style="color: var(--st-doing);">●  3 active</span>
+        </div>
+        <div class="org-progress"><div class="org-progress-fill" style="width: 64%;"></div></div>
+      </div>
+      <button class="btn">상세</button>
+    </div>
+
+    <div class="business">
+      <div class="business-h">
+        <span class="business-name">🗂 플링크케어 사업</span>
+        <span class="business-count">3 프로젝트</span>
+        <span class="business-desc">— 의료/건강 SaaS</span>
+      </div>
+      <div class="project-grid">
+        <div class="project-card" data-status="active">
+          <div class="project-h">
+            <div class="project-name">MC 개발</div>
+            <span class="project-status" data-s="active">active</span>
+          </div>
+          <div class="project-dates">2026-05-01 → 2026-08-31</div>
+          <div class="project-progress">
+            <div class="project-bar"><div class="project-bar-fill" style="width: 68%;"></div></div>
+            <div class="project-percent">68%</div>
+          </div>
+          <div class="stage-chips">
+            <span class="stage-chip" data-s="done">01_기획</span>
+            <span class="stage-chip" data-s="active">02_개발</span>
+            <span class="stage-chip">03_검토</span>
+            <span class="stage-chip">04_배포</span>
+          </div>
+          <div class="project-meta">
+            <span>📁 32</span><span>🐙 #42 외 4</span><span>🏷 2 블로킹</span>
+          </div>
+        </div>
+        <div class="project-card" data-status="planning">
+          <div class="project-h">
+            <div class="project-name">API 연동 모듈</div>
+            <span class="project-status" data-s="planning">planning</span>
+          </div>
+          <div class="project-dates">2026-06-01 → 2026-07-31</div>
+          <div class="project-progress">
+            <div class="project-bar"><div class="project-bar-fill" style="width: 8%;"></div></div>
+            <div class="project-percent">8%</div>
+          </div>
+          <div class="stage-chips">
+            <span class="stage-chip" data-s="active">01_기획</span>
+            <span class="stage-chip">02_설계</span>
+            <span class="stage-chip">03_개발</span>
+          </div>
+          <div class="project-meta"><span>📁 4</span></div>
+        </div>
+        <div class="project-card" data-status="done">
+          <div class="project-h">
+            <div class="project-name">v1.0 인증 시스템</div>
+            <span class="project-status" data-s="done">done</span>
+          </div>
+          <div class="project-dates">2026-02-01 → 2026-04-30</div>
+          <div class="project-progress">
+            <div class="project-bar"><div class="project-bar-fill" style="width: 100%;"></div></div>
+            <div class="project-percent">100%</div>
+          </div>
+          <div class="project-meta"><span>📁 18</span><span>🐙 24 closed</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="business">
+      <div class="business-h">
+        <span class="business-name">🗂 ODC 개발 사업</span>
+        <span class="business-count">2 프로젝트</span>
+      </div>
+      <div class="project-grid">
+        <div class="project-card" data-status="active">
+          <div class="project-h">
+            <div class="project-name">ODC v2.0</div>
+            <span class="project-status" data-s="active">active</span>
+          </div>
+          <div class="project-dates">2026-04-01 → 2026-09-30</div>
+          <div class="project-progress">
+            <div class="project-bar"><div class="project-bar-fill" style="width: 35%;"></div></div>
+            <div class="project-percent">35%</div>
+          </div>
+          <div class="stage-chips">
+            <span class="stage-chip" data-s="done">01_요구분석</span>
+            <span class="stage-chip" data-s="active">02_설계</span>
+            <span class="stage-chip">03_개발</span>
+            <span class="stage-chip">04_테스트</span>
+          </div>
+          <div class="project-meta"><span>📁 28</span><span>🐙 #128</span></div>
+        </div>
+        <div class="project-card" data-status="paused">
+          <div class="project-h">
+            <div class="project-name">ODC 연구 모듈</div>
+            <span class="project-status" data-s="paused">paused</span>
+          </div>
+          <div class="project-dates">— · 자료 대기</div>
+          <div class="project-progress">
+            <div class="project-bar"><div class="project-bar-fill" style="width: 22%;"></div></div>
+            <div class="project-percent">22%</div>
+          </div>
+          <div class="project-meta"><span style="color: oklch(40% 0.21 25);">⚠ external_block</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Bohun -->
+  <section class="org-section">
+    <div class="org-header" style="border-left-color: oklch(60% 0.18 30);">
+      <div class="org-logo" style="background: linear-gradient(135deg, oklch(65% 0.18 30), oklch(55% 0.18 30));">보</div>
+      <div class="org-info">
+        <div class="org-name">한국보훈진흥원</div>
+        <div class="org-stats">
+          <span class="org-stat"><strong>2</strong> 사업</span>
+          <span class="org-stat"><strong>4</strong> 프로젝트</span>
+          <span class="org-stat"><strong>28</strong> 항목</span>
+          <span class="org-stat" style="color: var(--st-doing);">● 2 active</span>
+        </div>
+        <div class="org-progress"><div class="org-progress-fill" style="width: 52%;"></div></div>
+      </div>
+      <button class="btn">상세</button>
+    </div>
+
+    <div class="business">
+      <div class="business-h">
+        <span class="business-name">🗂 데이터 플랫폼 사업</span>
+        <span class="business-count">3 프로젝트</span>
+      </div>
+      <div class="project-grid">
+        <div class="project-card" data-status="active">
+          <div class="project-h">
+            <div class="project-name">Q2 리뷰 자료</div>
+            <span class="project-status" data-s="active">active</span>
+          </div>
+          <div class="project-dates">2026-04-01 → 2026-06-30</div>
+          <div class="project-progress">
+            <div class="project-bar"><div class="project-bar-fill" style="width: 68%;"></div></div>
+            <div class="project-percent">68%</div>
+          </div>
+          <div class="stage-chips">
+            <span class="stage-chip" data-s="done">01_데이터</span>
+            <span class="stage-chip" data-s="active">02_분석</span>
+            <span class="stage-chip">03_보고서</span>
+          </div>
+          <div class="project-meta">
+            <span>📁 12</span><span>🐙 #38</span>
+            <span style="color: oklch(40% 0.18 50);">🟠 중요</span>
+          </div>
+        </div>
+        <div class="project-card" data-status="planning">
+          <div class="project-h">
+            <div class="project-name">대시보드 V2</div>
+            <span class="project-status" data-s="planning">planning</span>
+          </div>
+          <div class="project-dates">2026-07-01 → 2026-09-30</div>
+          <div class="project-progress">
+            <div class="project-bar"><div class="project-bar-fill" style="width: 0%;"></div></div>
+            <div class="project-percent">0%</div>
+          </div>
+          <div class="project-meta"><span>📁 0</span></div>
+        </div>
+        <div class="project-card" data-status="active">
+          <div class="project-h">
+            <div class="project-name">DB 마이그레이션</div>
+            <span class="project-status" data-s="active">active</span>
+          </div>
+          <div class="project-dates">2026-05-01 → 2026-05-31</div>
+          <div class="project-progress">
+            <div class="project-bar"><div class="project-bar-fill" style="width: 45%;"></div></div>
+            <div class="project-percent">45%</div>
+          </div>
+          <div class="stage-chips">
+            <span class="stage-chip" data-s="done">01_백업</span>
+            <span class="stage-chip" data-s="active">02_변환</span>
+            <span class="stage-chip">03_검증</span>
+          </div>
+          <div class="project-meta"><span>📁 6</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="business">
+      <div class="business-h">
+        <span class="business-name">🗂 위기관리 사업</span>
+        <span class="business-count">1 프로젝트</span>
+      </div>
+      <div class="project-grid">
+        <div class="project-card" data-status="done">
+          <div class="project-h">
+            <div class="project-name">Q1 점검 보고</div>
+            <span class="project-status" data-s="done">done</span>
+          </div>
+          <div class="project-dates">2026-01-01 → 2026-03-31</div>
+          <div class="project-progress">
+            <div class="project-bar"><div class="project-bar-fill" style="width: 100%;"></div></div>
+            <div class="project-percent">100%</div>
+          </div>
+          <div class="project-meta"><span>📁 22</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- KDInternational -->
+  <section class="org-section">
+    <div class="org-header" style="border-left-color: oklch(60% 0.15 145);">
+      <div class="org-logo" style="background: linear-gradient(135deg, oklch(60% 0.15 145), oklch(50% 0.15 145));">KD</div>
+      <div class="org-info">
+        <div class="org-name">KDInternational</div>
+        <div class="org-stats">
+          <span class="org-stat"><strong>1</strong> 사업</span>
+          <span class="org-stat"><strong>2</strong> 프로젝트</span>
+          <span class="org-stat"><strong>15</strong> 항목</span>
+        </div>
+        <div class="org-progress"><div class="org-progress-fill" style="width: 38%;"></div></div>
+      </div>
+      <button class="btn">상세</button>
+    </div>
+
+    <div class="business">
+      <div class="business-h">
+        <span class="business-name">🗂 글로벌 확장 사업</span>
+        <span class="business-count">2 프로젝트</span>
+      </div>
+      <div class="project-grid">
+        <div class="project-card" data-status="planning">
+          <div class="project-h">
+            <div class="project-name">EN 콘텐츠 번역</div>
+            <span class="project-status" data-s="planning">planning</span>
+          </div>
+          <div class="project-dates">2026-06-01 → 2026-08-31</div>
+          <div class="project-progress">
+            <div class="project-bar"><div class="project-bar-fill" style="width: 12%;"></div></div>
+            <div class="project-percent">12%</div>
+          </div>
+          <div class="project-meta"><span>📁 8</span></div>
+        </div>
+        <div class="project-card" data-status="active">
+          <div class="project-h">
+            <div class="project-name">파트너 미팅 시리즈</div>
+            <span class="project-status" data-s="active">active</span>
+          </div>
+          <div class="project-dates">2026-04-15 → 2026-06-15</div>
+          <div class="project-progress">
+            <div class="project-bar"><div class="project-bar-fill" style="width: 65%;"></div></div>
+            <div class="project-percent">65%</div>
+          </div>
+          <div class="project-meta"><span>📁 7</span><span>🗓 GCal 6건</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 무소속 -->
+  <div class="unowned">
+    <div class="unowned-h">📁 무소속 (소속·사업에 연결되지 않은 항목)</div>
+    <div style="display: flex; gap: 16px; align-items: center; font-size: 13px; color: var(--muted);">
+      <span>📋 8 태스크</span>
+      <span>📝 12 메모</span>
+      <span>★ 3 일정</span>
+      <span style="margin-left: auto; cursor: pointer; color: var(--brand);">전체 보기 →</span>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

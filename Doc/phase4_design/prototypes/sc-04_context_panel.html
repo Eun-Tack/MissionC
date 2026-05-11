@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>SC-04 Context Panel · MC</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css">
+<style>
+  :root {
+    --bg: oklch(99% 0.005 270); --fg: oklch(20% 0.02 270);
+    --muted: oklch(55% 0.015 270); --border: oklch(92% 0.01 270);
+    --surface: oklch(98% 0.005 270); --surface-2: oklch(96% 0.008 270);
+    --brand: oklch(58% 0.18 280); --brand-soft: oklch(95% 0.04 280);
+    --accent: oklch(70% 0.15 200); --gcal: oklch(55% 0.20 250);
+    --st-todo: oklch(60% 0.02 270); --st-doing: oklch(60% 0.18 240);
+    --st-done: oklch(60% 0.16 145);
+    --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: oklch(15% 0.01 270); --fg: oklch(94% 0.005 270);
+      --muted: oklch(65% 0.015 270); --border: oklch(28% 0.015 270);
+      --surface: oklch(20% 0.01 270); --surface-2: oklch(24% 0.012 270);
+      --brand-soft: oklch(28% 0.06 280);
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; font-family: 'Pretendard Variable', system-ui, sans-serif;
+               background: var(--bg); color: var(--fg); }
+
+  /* Stage shows the panel pulled out of context */
+  .stage {
+    height: 100vh; display: flex; align-items: center; justify-content: center;
+    background:
+      radial-gradient(circle at 30% 30%, oklch(95% 0.04 280), transparent 50%),
+      radial-gradient(circle at 70% 70%, oklch(94% 0.04 200), transparent 50%),
+      var(--bg);
+    padding: 40px;
+  }
+
+  .panel-wrapper {
+    width: 480px; height: 720px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    box-shadow: 0 24px 64px oklch(0% 0 0 / 0.08);
+    overflow: hidden;
+    display: flex; flex-direction: column;
+    animation: panel-in 480ms var(--ease);
+  }
+  @keyframes panel-in {
+    from { opacity: 0; transform: translateX(20px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+
+  /* Header */
+  .panel-h { padding: 20px 24px; border-bottom: 1px solid var(--border);
+             background: linear-gradient(180deg, var(--surface), transparent); }
+  .panel-meta-line { display: flex; align-items: center; gap: 8px;
+                     font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+  .icon-time { font-family: 'JetBrains Mono', monospace; }
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 2px 8px; border-radius: 999px;
+    font-size: 11px; font-weight: 500;
+  }
+  .status-pill[data-s="doing"] { background: oklch(94% 0.06 240); color: var(--st-doing); }
+  .status-pill .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: currentColor;
+    box-shadow: 0 0 0 2px currentColor;
+    opacity: 0.4;
+    animation: dot-pulse 2s ease-in-out infinite;
+  }
+  @keyframes dot-pulse {
+    0%, 100% { box-shadow: 0 0 0 2px currentColor; opacity: 0.4; }
+    50%      { box-shadow: 0 0 0 5px transparent; opacity: 1; }
+  }
+  .panel-title { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.2; }
+  .panel-sub { font-family: 'JetBrains Mono', monospace; font-size: 11px;
+               color: var(--muted); margin-top: 6px; }
+
+  /* Sections */
+  .scroll { flex: 1; overflow-y: auto; padding-bottom: 20px; }
+  .section { padding: 16px 24px; border-bottom: 1px solid var(--border); }
+  .section:last-child { border-bottom: 0; }
+  .sec-h { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .sec-h-title { font-size: 11px; font-weight: 600; text-transform: uppercase;
+                 letter-spacing: 0.05em; color: var(--muted); }
+  .sec-h .count { font-size: 10px; padding: 1px 6px; background: var(--surface-2);
+                  border-radius: 999px; color: var(--muted); }
+
+  /* Project section */
+  .breadcrumb { font-size: 11px; color: var(--muted); margin-bottom: 6px;
+                display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+  .breadcrumb span:last-child { color: var(--brand); font-weight: 500; }
+  .proj-row { display: flex; align-items: baseline; gap: 8px; }
+  .proj-name { font-size: 14px; font-weight: 600; }
+  .proj-percent { font-family: 'JetBrains Mono', monospace; font-size: 12px;
+                  color: var(--muted); }
+  .proj-bar { height: 4px; background: var(--surface-2); border-radius: 999px;
+              margin-top: 6px; overflow: hidden; }
+  .proj-bar-fill { height: 100%; border-radius: 999px;
+                   background: linear-gradient(90deg, var(--brand), var(--accent)); }
+  .proj-stage-mini { font-size: 11px; color: var(--muted); margin-top: 6px; }
+  .proj-stage-mini .now { color: var(--st-doing); font-weight: 500; }
+
+  /* Tags & Labels */
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .label {
+    display: inline-flex; align-items: center; padding: 2px 8px;
+    font-size: 11px; font-weight: 500; border-radius: 999px;
+  }
+  .label[data-t="important"] { background: oklch(94% 0.06 50);  color: oklch(40% 0.18 50); }
+  .label[data-t="confirm"]   { background: oklch(95% 0.06 80);  color: oklch(35% 0.18 80); }
+  .label[data-t="block"]     { background: oklch(94% 0.06 25);  color: oklch(40% 0.21 25); }
+
+  .tag-chip { font-size: 11px; padding: 2px 8px; background: var(--surface-2);
+              color: var(--muted); border-radius: 4px; }
+  .tag-add { font-size: 11px; padding: 2px 8px; border: 1px dashed var(--border);
+             background: transparent; color: var(--muted); border-radius: 4px;
+             cursor: pointer; }
+  .tag-add:hover { border-color: var(--brand); color: var(--brand); }
+
+  /* Memo card with lifecycle */
+  .memo-card {
+    padding: 12px; background: var(--surface-2); border-radius: 10px;
+    cursor: pointer; transition: transform 240ms var(--ease);
+    position: relative;
+  }
+  .memo-card:hover { transform: translateX(2px); }
+  .memo-h { display: flex; align-items: center; gap: 6px; }
+  .memo-name { font-size: 13px; font-weight: 500; }
+  .lifecycle-mark {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--brand);
+    animation: mc-breathe 3.6s ease-in-out infinite;
+  }
+  @keyframes mc-breathe {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.5; transform: scale(1.3); }
+  }
+  .memo-evo { font-size: 10px; color: var(--brand);
+              font-family: 'JetBrains Mono', monospace; }
+  .memo-preview { font-size: 12px; color: var(--muted); line-height: 1.5;
+                  margin-top: 6px;
+                  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+                  overflow: hidden; }
+  .memo-link { font-size: 11px; color: var(--brand); cursor: pointer; margin-top: 6px;
+               display: inline-block; }
+
+  /* GitHub */
+  .gh-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
+  .gh-num { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); }
+  .gh-title { flex: 1; font-size: 13px; }
+  .gh-state {
+    font-size: 10px; padding: 1px 6px; border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace; text-transform: uppercase;
+  }
+  .gh-state[data-s="open"]   { background: oklch(94% 0.06 145); color: oklch(40% 0.16 145); }
+  .gh-state[data-s="closed"] { background: var(--surface-2); color: var(--muted); }
+  .gh-actions { margin-top: 10px; display: flex; gap: 6px; }
+  .btn-mini { padding: 5px 10px; font-size: 11px; border: 1px solid var(--border);
+              background: var(--surface); border-radius: 6px; cursor: pointer; }
+  .btn-mini:hover { background: var(--surface-2); }
+  .btn-mini.primary { background: var(--brand); color: white; border-color: var(--brand); }
+
+  /* Footer actions */
+  .panel-foot {
+    padding: 12px 24px; border-top: 1px solid var(--border);
+    display: flex; gap: 8px; background: var(--surface);
+  }
+  .btn-action { padding: 8px 12px; font-size: 12px; border-radius: 8px;
+                border: 1px solid var(--border); background: var(--bg); cursor: pointer;
+                font-weight: 500; }
+  .btn-action.primary { background: var(--brand); color: white; border-color: var(--brand); }
+  .panel-foot .spacer { flex: 1; }
+
+  /* Outside hint */
+  .stage-hint {
+    position: absolute; top: 24px; left: 24px;
+    font-size: 12px; color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* === Add file button === */
+  .add-file-btn {
+    margin-top: 12px;
+    width: 100%;
+    padding: 10px;
+    border: 1px dashed var(--border);
+    background: transparent;
+    color: var(--muted);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 120ms;
+  }
+  .add-file-btn:hover { border-color: var(--brand); color: var(--brand); }
+
+  /* === File link modal === */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: oklch(0% 0 0 / 0.4);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: none;
+    align-items: center; justify-content: center;
+    z-index: 100;
+    animation: overlay-in 240ms var(--ease);
+  }
+  .modal-overlay.open { display: flex; }
+  @keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
+
+  .modal {
+    width: 560px; max-height: 600px;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: 0 24px 64px oklch(0% 0 0 / 0.2);
+    overflow: hidden; display: flex; flex-direction: column;
+    animation: modal-in 320ms var(--ease);
+  }
+  @keyframes modal-in {
+    from { opacity: 0; transform: translateY(8px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .modal-h {
+    padding: 16px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .modal-title { font-size: 15px; font-weight: 700; }
+  .modal-close { background: none; border: none; font-size: 18px; color: var(--muted);
+                 cursor: pointer; }
+
+  .modal-tabs {
+    display: flex; padding: 0 16px; gap: 4px;
+    border-bottom: 1px solid var(--border); background: var(--surface);
+  }
+  .tab-btn {
+    padding: 12px 16px; font-size: 13px; font-weight: 500;
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    border-bottom: 2px solid transparent; transition: all 120ms;
+  }
+  .tab-btn.active { color: var(--brand); border-bottom-color: var(--brand); }
+
+  .modal-body { flex: 1; overflow-y: auto; padding: 20px; min-height: 280px; }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* Tab 1: Tree */
+  .tree-search-modal {
+    width: 100%; padding: 8px 12px 8px 32px; font-size: 13px;
+    border: 1px solid var(--border); border-radius: 8px;
+    background: var(--surface);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: 10px center; background-size: 14px;
+    margin-bottom: 12px;
+  }
+  .modal-tree-item {
+    padding: 6px 10px; font-size: 13px; border-radius: 6px;
+    cursor: pointer; display: flex; align-items: center; gap: 6px;
+  }
+  .modal-tree-item:hover { background: var(--surface-2); }
+  .modal-tree-item.depth-1 { padding-left: 22px; }
+  .modal-tree-item.depth-2 { padding-left: 34px; }
+  .modal-tree-item input[type="checkbox"] { margin-right: 4px; }
+  .modal-tree-item .meta { margin-left: auto; font-size: 11px; color: var(--muted); }
+
+  /* Tab 2: Search */
+  .search-result {
+    padding: 10px 12px; border-radius: 8px; cursor: pointer;
+    display: flex; align-items: center; gap: 10px;
+    transition: background 120ms;
+  }
+  .search-result:hover { background: var(--surface-2); }
+  .search-result .ico { color: var(--muted); }
+  .search-result .info { flex: 1; }
+  .search-result .name { font-size: 13px; font-weight: 500; }
+  .search-result .preview { font-size: 11px; color: var(--muted);
+                            white-space: nowrap; overflow: hidden;
+                            text-overflow: ellipsis; max-width: 380px; }
+  .search-result .score { font-family: 'JetBrains Mono', monospace; font-size: 10px;
+                          color: var(--brand); }
+
+  /* Tab 3: External */
+  .drop-zone {
+    margin-bottom: 16px;
+    padding: 32px;
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    text-align: center;
+    transition: all 240ms var(--ease);
+    background: var(--surface);
+  }
+  .drop-zone.dragging {
+    border-color: var(--brand);
+    background: var(--brand-soft);
+    transform: scale(1.02);
+  }
+  .drop-zone .icon {
+    font-size: 32px; opacity: 0.4; margin-bottom: 8px;
+    transition: all 240ms;
+  }
+  .drop-zone.dragging .icon { opacity: 1; transform: translateY(-4px); }
+  .drop-zone .text { font-size: 13px; font-weight: 500; }
+  .drop-zone .hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  .or-divider {
+    text-align: center; color: var(--muted); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    margin: 16px 0; position: relative;
+  }
+  .or-divider::before, .or-divider::after {
+    content: ''; position: absolute; top: 50%;
+    width: calc(50% - 24px); height: 1px; background: var(--border);
+  }
+  .or-divider::before { left: 0; }
+  .or-divider::after { right: 0; }
+
+  .path-input-wrap { display: flex; gap: 8px; }
+  .path-input {
+    flex: 1; padding: 10px 12px; border: 1px solid var(--border);
+    border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    background: var(--surface); color: var(--fg);
+  }
+  .copy-policy {
+    margin-top: 12px; padding: 10px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; font-size: 12px;
+  }
+  .copy-policy label {
+    display: flex; align-items: center; gap: 6px; padding: 4px 0;
+    cursor: pointer;
+  }
+  .copy-policy strong { color: var(--brand); }
+
+  .modal-foot {
+    padding: 12px 20px; border-top: 1px solid var(--border);
+    display: flex; justify-content: flex-end; gap: 8px; background: var(--surface);
+  }
+  .modal-btn {
+    padding: 8px 16px; font-size: 13px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--bg); cursor: pointer;
+    font-weight: 500;
+  }
+  .modal-btn.primary { background: var(--brand); color: white; border-color: var(--brand); }
+  .modal-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Morph demo button */
+  .demo-morph {
+    margin: 16px 24px; padding: 12px;
+    background: var(--brand-soft);
+    border: 1px dashed var(--brand);
+    border-radius: 10px;
+    font-size: 12px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 240ms var(--ease);
+  }
+  .demo-morph:hover { background: oklch(92% 0.06 280); }
+  .demo-morph strong { color: var(--brand); }
+
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="stage-hint">SC-04 · Context Panel · 0.5초 펼침 (FR-FLOW-03)</div>
+
+  <div class="panel-wrapper">
+
+    <!-- Header -->
+    <div class="panel-h">
+      <div class="panel-meta-line">
+        <span>★ 일정</span>
+        <span class="icon-time">10:00 ~ 11:00</span>
+        <span class="status-pill" data-s="doing"><span class="dot"></span>doing</span>
+      </div>
+      <div class="panel-title">투자자 미팅</div>
+      <div class="panel-sub">id: 1842 · scheduled_at: 2026-05-06T10:00:00+09:00</div>
+    </div>
+
+    <div class="scroll">
+
+      <!-- Project section -->
+      <div class="section">
+        <div class="sec-h">
+          <span class="sec-h-title">📂 프로젝트</span>
+        </div>
+        <div class="breadcrumb">
+          <span>한국보훈진흥원</span><span>›</span>
+          <span>데이터 플랫폼</span><span>›</span>
+          <span>Q2 리뷰 자료</span>
+        </div>
+        <div class="proj-row">
+          <span class="proj-name">Q2 리뷰 자료</span>
+          <span class="proj-percent">68%</span>
+        </div>
+        <div class="proj-bar"><div class="proj-bar-fill" style="width: 68%;"></div></div>
+        <div class="proj-stage-mini">
+          01_데이터 ✓ · <span class="now">02_분석 진행중</span> · 03_보고서
+        </div>
+      </div>
+
+      <!-- Tags & Labels -->
+      <div class="section">
+        <div class="sec-h">
+          <span class="sec-h-title">🏷 라벨 · 태그</span>
+        </div>
+        <div class="chips">
+          <span class="label" data-t="important">🟠 중요</span>
+          <span class="tag-chip">#보훈진흥원</span>
+          <span class="tag-chip">#회의</span>
+          <span class="tag-chip">#Q2</span>
+          <button class="tag-add">+ 태그</button>
+        </div>
+      </div>
+
+      <!-- Memos -->
+      <div class="section">
+        <div class="sec-h">
+          <span class="sec-h-title">📝 연결 메모</span>
+          <span class="count">3</span>
+        </div>
+        <div class="memo-card" style="margin-bottom: 8px;">
+          <div class="memo-h">
+            <span>📝</span>
+            <span class="memo-name">미팅 안건.md</span>
+            <span class="lifecycle-mark" title="evolution 4"></span>
+            <span class="memo-evo">evo 4</span>
+          </div>
+          <div class="memo-preview">
+            1. NPU 벤치마크 결과 공유<br>
+            2. Q2 진척도 보고 — 68% (예상 70% 대비 -2%)<br>
+            3. V1.1 로드맵 — Phi-3, Drive Cold tier
+          </div>
+          <span class="memo-link">전체 보기 →</span>
+        </div>
+        <div class="memo-card">
+          <div class="memo-h">
+            <span>📝</span>
+            <span class="memo-name">리뷰 결과.md</span>
+            <span class="memo-evo" style="color: var(--muted);">evo 1</span>
+          </div>
+          <div class="memo-preview" style="color: var(--muted);">
+            (아직 작성 안 됨 — 미팅 후 자동 생성 예정)
+          </div>
+        </div>
+      </div>
+
+      <!-- 파일 추가 버튼 (FILE LINK MODAL 트리거) -->
+      <div class="section">
+        <button class="add-file-btn" id="openFileModal">
+          📎 파일 · 폴더 추가 — 트리 / 검색 / 외부
+        </button>
+      </div>
+
+      <!-- Memo→Task Morph 데모 -->
+      <div class="demo-morph" id="morphDemo">
+        <strong>↻ Memo → Task</strong> 변환 데모 — 클릭해보세요<br>
+        <span style="color: var(--muted);">메모에 체크박스를 추가하면 task로 자동 승격</span>
+      </div>
+
+      <!-- GitHub -->
+      <div class="section">
+        <div class="sec-h">
+          <span class="sec-h-title">🐙 GitHub · bohun/q2</span>
+          <span class="count">3</span>
+        </div>
+        <div class="gh-row">
+          <span class="gh-num">#42</span>
+          <span class="gh-title">Q2 리뷰 자료 작성</span>
+          <span class="gh-state" data-s="open">open</span>
+        </div>
+        <div class="gh-row">
+          <span class="gh-num">#39</span>
+          <span class="gh-title">대시보드 V1 PR</span>
+          <span class="gh-state" data-s="closed">closed</span>
+        </div>
+        <div class="gh-row">
+          <span class="gh-num">#38</span>
+          <span class="gh-title">DB 마이그레이션 검토</span>
+          <span class="gh-state" data-s="open">open</span>
+        </div>
+        <div class="gh-actions">
+          <button class="btn-mini primary">+ 새 이슈</button>
+          <button class="btn-mini">모두 보기</button>
+        </div>
+      </div>
+
+      <!-- Files (project folder) -->
+      <div class="section">
+        <div class="sec-h">
+          <span class="sec-h-title">📁 프로젝트 폴더</span>
+          <span class="count">12 파일</span>
+        </div>
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); line-height: 1.8;">
+          MC-Notes/보훈진흥원/<br>
+          &nbsp;&nbsp;데이터-플랫폼/<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;Q2-리뷰-자료/<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: var(--brand);">02_분석/</span>
+          <span style="color: var(--st-doing);">← 현재</span>
+        </div>
+        <div style="font-size: 11px; color: var(--muted); margin-top: 8px;">
+          🔄 GDrive 동기 · 마지막 sync 2분 전
+        </div>
+      </div>
+
+    </div>
+
+    <div class="panel-foot">
+      <button class="btn-action">완료</button>
+      <button class="btn-action">보류</button>
+      <div class="spacer"></div>
+      <button class="btn-action primary">편집</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ================================================
+     File Link Modal (FR-FLOW-03 + FR-FILES-01/02)
+================================================ -->
+<div class="modal-overlay" id="fileModal">
+  <div class="modal">
+    <div class="modal-h">
+      <span class="modal-title">📎 파일 · 폴더 연결</span>
+      <button class="modal-close" id="closeModal">×</button>
+    </div>
+
+    <div class="modal-tabs">
+      <button class="tab-btn active" data-tab="tree">🌲 폴더 트리</button>
+      <button class="tab-btn" data-tab="search">🔍 의미 검색</button>
+      <button class="tab-btn" data-tab="external">📥 외부 파일</button>
+    </div>
+
+    <div class="modal-body">
+
+      <!-- Tab 1: Tree -->
+      <div class="tab-content active" data-tab="tree">
+        <input class="tree-search-modal" placeholder="MC-Notes/ 안에서 파일/폴더 검색" />
+        <div class="modal-tree-item"><input type="checkbox"> 📂 플링크데이터</div>
+        <div class="modal-tree-item depth-1"><input type="checkbox"> 🗂 플링크케어 사업</div>
+        <div class="modal-tree-item depth-2"><input type="checkbox" checked> 📂 MC 개발</div>
+        <div class="modal-tree-item depth-2" style="padding-left: 50px;"><input type="checkbox"> ✓ 01_기획 (8)</div>
+        <div class="modal-tree-item depth-2" style="padding-left: 50px; color: var(--brand);"><input type="checkbox" checked> ● 02_개발 (10)<span class="meta">현재</span></div>
+        <div class="modal-tree-item depth-2" style="padding-left: 70px;"><input type="checkbox"> 📝 스펙.md</div>
+        <div class="modal-tree-item depth-2" style="padding-left: 70px;"><input type="checkbox" checked> 📝 아키텍처 결정 노트.md<span class="meta">evo 5</span></div>
+        <div class="modal-tree-item depth-2" style="padding-left: 70px;"><input type="checkbox"> 📝 NPU-벤치마크.md<span class="meta">evo 4</span></div>
+        <div class="modal-tree-item depth-2" style="padding-left: 70px;"><input type="checkbox"> 📊 통계.ipynb</div>
+        <div class="modal-tree-item depth-1"><input type="checkbox"> 🗂 ODC 개발 사업</div>
+        <div class="modal-tree-item"><input type="checkbox"> 📂 한국보훈진흥원</div>
+        <div class="modal-tree-item"><input type="checkbox"> 📂 무소속</div>
+        <p style="font-size: 11px; color: var(--muted); margin-top: 12px; padding: 8px; background: var(--surface); border-radius: 6px;">
+          체크박스로 다중 선택 · 폴더 선택 시 그 안의 모든 파일이 연결됨 (BR-FILES-02)
+        </p>
+      </div>
+
+      <!-- Tab 2: Semantic Search -->
+      <div class="tab-content" data-tab="search">
+        <input class="tree-search-modal" placeholder="의미 검색 — 'NPU 벤치마크'" value="NPU 벤치마크" />
+        <p style="font-size: 11px; color: var(--muted); margin-bottom: 8px;">
+          KoE5 NPU 임베딩 · 7개 결과 · 145ms
+        </p>
+        <div class="search-result">
+          <span class="ico">📝</span>
+          <div class="info">
+            <div class="name">NPU-벤치마크.md</div>
+            <div class="preview">Whisper Base ≈ 2.1초, KoE5 ≈ 87ms, Phi-3 mini INT4 ≈ 540ms...</div>
+          </div>
+          <span class="score">0.94</span>
+        </div>
+        <div class="search-result">
+          <span class="ico">📝</span>
+          <div class="info">
+            <div class="name">아키텍처 결정 노트.md</div>
+            <div class="preview">NPU 추론 EP — Intel Core Ultra 7의 NPU(AI Boost)를 활용...</div>
+          </div>
+          <span class="score">0.89</span>
+        </div>
+        <div class="search-result">
+          <span class="ico">📝</span>
+          <div class="info">
+            <div class="name">2026-04-30.md</div>
+            <div class="preview">Whisper Base 변환 시간 측정. 5단어 발화 기준 ~3초 목표 달성...</div>
+          </div>
+          <span class="score">0.82</span>
+        </div>
+        <div class="search-result">
+          <span class="ico">🐙</span>
+          <div class="info">
+            <div class="name">issue #41 — NPU 벤치마크 결과 검토</div>
+            <div class="preview">현재 OpenVINO EP를 사용 중이며 INT8 정량화 모델만 가속...</div>
+          </div>
+          <span class="score">0.78</span>
+        </div>
+      </div>
+
+      <!-- Tab 3: External -->
+      <div class="tab-content" data-tab="external">
+        <div class="drop-zone" id="dropZone">
+          <div class="icon">📂</div>
+          <div class="text">파일을 끌어다 놓으세요</div>
+          <div class="hint">.md / .pdf / .png / .ipynb 등 — 다중 파일 가능</div>
+        </div>
+
+        <div class="or-divider">또는 절대 경로</div>
+
+        <div class="path-input-wrap">
+          <input class="path-input" placeholder="C:\Users\iet03\Downloads\report.pdf" />
+          <button class="modal-btn">확인</button>
+        </div>
+
+        <div class="copy-policy">
+          <strong>가져오기 정책</strong>
+          <label>
+            <input type="radio" name="policy" checked>
+            <span><strong>복사</strong> — MC-Notes/inbox/ 로 복사 후 정리. 권장 (단일 원본 유지)</span>
+          </label>
+          <label>
+            <input type="radio" name="policy">
+            <span><strong>이동</strong> — 원본을 MC-Notes/inbox/ 로 옮김</span>
+          </label>
+          <label>
+            <input type="radio" name="policy">
+            <span><strong>외부 링크만</strong> — path만 저장, 원본 그대로. MC는 읽기 전용</span>
+          </label>
+        </div>
+
+        <p style="font-size: 11px; color: var(--muted); margin-top: 12px; padding: 8px; background: var(--surface-2); border-radius: 6px;">
+          ℹ️ 브라우저 보안상 드래그만으로는 path를 직접 받을 수 없습니다.
+          파일은 서버로 업로드되어 위 정책에 따라 처리됩니다.
+        </p>
+      </div>
+
+    </div>
+
+    <div class="modal-foot">
+      <span style="margin-right: auto; font-size: 11px; color: var(--muted); align-self: center;">
+        선택: <strong style="color: var(--fg);">2개 파일 · 1개 폴더</strong>
+      </span>
+      <button class="modal-btn">취소</button>
+      <button class="modal-btn primary">3개 항목 연결</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // === Open / close modal ===
+  document.getElementById('openFileModal').addEventListener('click', () => {
+    document.getElementById('fileModal').classList.add('open');
+  });
+  document.getElementById('closeModal').addEventListener('click', () => {
+    document.getElementById('fileModal').classList.remove('open');
+  });
+  document.getElementById('fileModal').addEventListener('click', e => {
+    if (e.target.id === 'fileModal') e.currentTarget.classList.remove('open');
+  });
+
+  // === Tab switching ===
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tab = btn.dataset.tab;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      document.querySelector(`.tab-content[data-tab="${tab}"]`).classList.add('active');
+    });
+  });
+
+  // === Drag-drop visual ===
+  const dropZone = document.getElementById('dropZone');
+  ['dragenter', 'dragover'].forEach(ev => {
+    dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.add('dragging'); });
+  });
+  ['dragleave', 'drop'].forEach(ev => {
+    dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.remove('dragging'); });
+  });
+  dropZone.addEventListener('drop', e => {
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) {
+      dropZone.querySelector('.text').textContent = `${files.length}개 파일 받음`;
+      dropZone.querySelector('.hint').textContent = files.map(f => f.name).join(' · ');
+    }
+  });
+
+  // Memo → Task morph demo
+  document.getElementById('morphDemo').addEventListener('click', () => {
+    const memo = document.querySelector('.memo-card');
+    const morph = document.getElementById('morphDemo');
+
+    // 1. Pulse the memo card
+    memo.animate([
+      { transform: 'scale(1)',    backgroundColor: 'var(--surface-2)' },
+      { transform: 'scale(1.04)', backgroundColor: 'oklch(94% 0.06 240)' },
+      { transform: 'scale(1)',    backgroundColor: 'oklch(96% 0.04 240)' }
+    ], { duration: 480, easing: 'cubic-bezier(0.32, 0.72, 0, 1)', fill: 'forwards' });
+
+    // 2. Update label inside memo
+    setTimeout(() => {
+      const ic = memo.querySelector('.memo-h span:first-child');
+      if (ic) ic.textContent = '☐';
+      const evo = memo.querySelector('.memo-evo');
+      if (evo) evo.textContent = '→ task';
+      const preview = memo.querySelector('.memo-preview');
+      if (preview) preview.innerHTML = '☐ NPU 벤치마크 자료 정리<br>☐ Q2 진척도 그래프 작성<br>☐ V1.1 로드맵 정리';
+    }, 240);
+
+    morph.style.opacity = 0.4;
+    morph.innerHTML = '<strong>✓ task로 변환됨</strong> · type=memo → task · WAAPI 480ms';
+  });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>MC Design System v1.5</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css">
+<style>
+  :root {
+    /* OKLCH 기반 — 한 톤에서 채도·명도만 변주 */
+    --bg:        oklch(99% 0.005 270);
+    --fg:        oklch(20% 0.02 270);
+    --muted:     oklch(55% 0.015 270);
+    --border:    oklch(92% 0.01 270);
+    --surface:   oklch(98% 0.005 270);
+    --surface-2: oklch(96% 0.008 270);
+
+    /* Brand — 보라색 계열, 깊이 있는 톤 */
+    --brand:     oklch(58% 0.18 280);
+    --brand-soft: oklch(95% 0.04 280);
+    --accent:    oklch(70% 0.15 200);  /* 청록 */
+
+    /* 상태 */
+    --st-todo:    oklch(60% 0.02 270);
+    --st-doing:   oklch(60% 0.18 240);  /* 파랑 */
+    --st-done:    oklch(60% 0.16 145);  /* 초록 */
+    --st-waiting: oklch(70% 0.14 80);   /* 노랑 */
+    --st-cancel:  oklch(55% 0.02 270);  /* 회색 */
+
+    /* 라벨 5종 */
+    --lbl-confirm:  oklch(75% 0.16 80);    /* 확인 필요 — yellow */
+    --lbl-review:   oklch(65% 0.16 240);   /* 검토중 — blue */
+    --lbl-block:    oklch(60% 0.21 25);    /* 블로킹 — red */
+    --lbl-important:oklch(68% 0.18 50);    /* 중요 — orange */
+    --lbl-pending:  oklch(60% 0.02 270);   /* 완료 대기 — gray */
+
+    /* GCal 뱃지 — Google blue */
+    --gcal: oklch(55% 0.20 250);
+
+    /* Spacing */
+    --s-1: 0.25rem; --s-2: 0.5rem; --s-3: 0.75rem;
+    --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem;
+
+    /* Radius */
+    --r-1: 4px; --r-2: 8px; --r-3: 12px; --r-4: 16px;
+
+    /* Motion */
+    --ease: cubic-bezier(0.32, 0.72, 0, 1);
+    --dur-fast: 120ms;
+    --dur-base: 240ms;
+    --dur-slow: 480ms;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:        oklch(15% 0.01 270);
+      --fg:        oklch(94% 0.005 270);
+      --muted:     oklch(65% 0.015 270);
+      --border:    oklch(28% 0.015 270);
+      --surface:   oklch(20% 0.01 270);
+      --surface-2: oklch(24% 0.012 270);
+      --brand-soft:oklch(28% 0.06 280);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { font-family: 'Pretendard Variable', system-ui, sans-serif; font-feature-settings: 'cv11'; }
+  body { background: var(--bg); color: var(--fg); margin: 0; }
+
+  /* === 인터랙션 === */
+
+  /* Lifecycle pulse — evolution_count ≥ 3 메모 (FR-MEMO-07) */
+  @keyframes mc-breathe {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50%      { transform: scale(1.005); opacity: 0.92; }
+  }
+  .mc-breathe { animation: mc-breathe 3.6s ease-in-out infinite; }
+
+  /* Hover lift — 부드러운 깊이감 */
+  .mc-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-3);
+    transition: transform var(--dur-base) var(--ease),
+                box-shadow var(--dur-base) var(--ease);
+  }
+  .mc-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px oklch(0% 0 0 / 0.06);
+  }
+
+  /* Status dot — todo/doing/done */
+  .mc-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    display: inline-block;
+  }
+  .mc-dot[data-status="todo"]    { background: var(--st-todo); }
+  .mc-dot[data-status="doing"]   { background: var(--st-doing); box-shadow: 0 0 0 3px oklch(60% 0.18 240 / 0.15); }
+  .mc-dot[data-status="done"]    { background: var(--st-done); }
+  .mc-dot[data-status="waiting"] { background: var(--st-waiting); }
+
+  /* Label chip */
+  .mc-label {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px;
+    font-size: 11px; font-weight: 500;
+    border-radius: 999px;
+    line-height: 1.6;
+  }
+  .mc-label[data-type="confirm"]  { background: oklch(95% 0.06 80);  color: oklch(35% 0.18 80); }
+  .mc-label[data-type="review"]   { background: oklch(94% 0.05 240); color: oklch(35% 0.18 240); }
+  .mc-label[data-type="block"]    { background: oklch(94% 0.06 25);  color: oklch(40% 0.21 25); }
+  .mc-label[data-type="important"]{ background: oklch(94% 0.06 50);  color: oklch(40% 0.18 50); }
+  .mc-label[data-type="pending"]  { background: var(--surface-2);    color: var(--muted); }
+
+  /* GCal badge */
+  .mc-gcal {
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 1px 6px;
+    font-size: 10px; font-weight: 500;
+    color: var(--gcal);
+    background: oklch(96% 0.03 250);
+    border-radius: 4px;
+  }
+
+  /* Button */
+  .mc-btn {
+    padding: 6px 12px;
+    border-radius: var(--r-2);
+    font-size: 13px; font-weight: 500;
+    transition: all var(--dur-fast) var(--ease);
+    cursor: pointer;
+    border: none;
+  }
+  .mc-btn-primary { background: var(--brand); color: white; }
+  .mc-btn-primary:hover { background: oklch(52% 0.18 280); }
+  .mc-btn-ghost { background: transparent; color: var(--fg); border: 1px solid var(--border); }
+  .mc-btn-ghost:hover { background: var(--surface-2); }
+
+  /* Section */
+  .ds-section { padding: var(--s-6); border-top: 1px solid var(--border); }
+  .ds-section:first-of-type { border-top: 0; }
+  .ds-grid { display: grid; grid-template-columns: 200px 1fr; gap: var(--s-5); }
+  .ds-h { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .ds-token { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-2); background: var(--surface); border-radius: var(--r-2); font-size: 12px; }
+  .ds-swatch { width: 36px; height: 24px; border-radius: 4px; border: 1px solid var(--border); }
+</style>
+</head>
+<body>
+
+<header style="padding: var(--s-7); border-bottom: 1px solid var(--border); background: linear-gradient(to bottom, var(--brand-soft), transparent);">
+  <h1 style="font-size: 32px; font-weight: 800; letter-spacing: -0.02em; margin: 0;">MC Design System</h1>
+  <p style="color: var(--muted); margin: 8px 0 0;">v1.5 — Personal · Connected · Quiet · <span style="color: var(--brand); font-weight: 600;">Alive</span></p>
+</header>
+
+<section class="ds-section">
+  <div class="ds-grid">
+    <div class="ds-h">Color · 의미 우선</div>
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--s-3);">
+      <div class="ds-token"><div class="ds-swatch" style="background: var(--brand);"></div><div><b>brand</b><br><span style="color: var(--muted);">oklch(58% .18 280)</span></div></div>
+      <div class="ds-token"><div class="ds-swatch" style="background: var(--accent);"></div><div><b>accent</b><br><span style="color: var(--muted);">oklch(70% .15 200)</span></div></div>
+      <div class="ds-token"><div class="ds-swatch" style="background: var(--st-todo);"></div><div>status · todo</div></div>
+      <div class="ds-token"><div class="ds-swatch" style="background: var(--st-doing);"></div><div>status · doing</div></div>
+      <div class="ds-token"><div class="ds-swatch" style="background: var(--st-done);"></div><div>status · done</div></div>
+      <div class="ds-token"><div class="ds-swatch" style="background: var(--st-waiting);"></div><div>status · waiting</div></div>
+      <div class="ds-token"><div class="ds-swatch" style="background: var(--gcal);"></div><div>gcal · google blue</div></div>
+      <div class="ds-token"><div class="ds-swatch" style="background: var(--border);"></div><div>border · 12% on surface</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="ds-section">
+  <div class="ds-grid">
+    <div class="ds-h">Typography · Pretendard</div>
+    <div>
+      <p style="font-size: 32px; font-weight: 800; letter-spacing: -0.02em; margin: 0;">Display 32 / 800 · 영문 한글 1234</p>
+      <p style="font-size: 22px; font-weight: 700; letter-spacing: -0.01em; margin: 8px 0 0;">Heading 22 / 700</p>
+      <p style="font-size: 16px; font-weight: 500; margin: 8px 0 0;">Body 16 / 500 — 본문 우선 가독성. 행간 1.6.</p>
+      <p style="font-size: 13px; font-weight: 400; color: var(--muted); margin: 8px 0 0;">Small 13 / 400 — 메타 / 보조 정보</p>
+      <p style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; color: var(--muted); margin: 8px 0 0;">Mono 12 — 코드 / 시간 / ID</p>
+    </div>
+  </div>
+</section>
+
+<section class="ds-section">
+  <div class="ds-grid">
+    <div class="ds-h">Status · Dot</div>
+    <div style="display: flex; gap: var(--s-5); align-items: center;">
+      <span><span class="mc-dot" data-status="todo"></span> todo</span>
+      <span><span class="mc-dot" data-status="doing"></span> doing <span style="color: var(--muted); font-size: 11px;">(glow ring)</span></span>
+      <span><span class="mc-dot" data-status="done"></span> done</span>
+      <span><span class="mc-dot" data-status="waiting"></span> waiting</span>
+    </div>
+  </div>
+</section>
+
+<section class="ds-section">
+  <div class="ds-grid">
+    <div class="ds-h">Label · 시스템 5종 + 커스텀</div>
+    <div style="display: flex; gap: var(--s-2); flex-wrap: wrap;">
+      <span class="mc-label" data-type="confirm">🟡 확인 필요</span>
+      <span class="mc-label" data-type="review">🔵 검토중</span>
+      <span class="mc-label" data-type="block">🔴 블로킹</span>
+      <span class="mc-label" data-type="important">🟠 중요</span>
+      <span class="mc-label" data-type="pending">⚪ 완료 대기</span>
+    </div>
+  </div>
+</section>
+
+<section class="ds-section">
+  <div class="ds-grid">
+    <div class="ds-h">External · Google Calendar</div>
+    <div style="display: flex; gap: var(--s-3); align-items: center;">
+      <span class="mc-gcal">🗓 GCal</span>
+      <span style="color: var(--muted); font-size: 12px;">Today's Flow / Calendar에서 외부 이벤트 식별 (FR-INT-GCAL-01)</span>
+    </div>
+  </div>
+</section>
+
+<section class="ds-section">
+  <div class="ds-grid">
+    <div class="ds-h">Card · 호버 깊이감</div>
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-3); max-width: 700px;">
+      <div class="mc-card" style="padding: var(--s-4);">
+        <div style="font-size: 11px; color: var(--muted); margin-bottom: 4px;">09:00 · 일정</div>
+        <div style="font-weight: 600;">팀 조회 미팅</div>
+        <div style="margin-top: 6px;"><span class="mc-dot" data-status="todo"></span></div>
+      </div>
+      <div class="mc-card mc-breathe" style="padding: var(--s-4); border-color: var(--brand-soft);">
+        <div style="font-size: 11px; color: var(--brand); margin-bottom: 4px;">📝 메모 · evolution 5</div>
+        <div style="font-weight: 600;">아키텍처 결정 노트</div>
+        <div style="font-size: 11px; color: var(--muted); margin-top: 4px;">5번 진화한 메모 (lifecycle pulse)</div>
+      </div>
+      <div class="mc-card" style="padding: var(--s-4);">
+        <div style="font-size: 11px; color: var(--muted); margin-bottom: 4px;">14:00 · 회의 <span class="mc-gcal">🗓 GCal</span></div>
+        <div style="font-weight: 600;">투자자 미팅</div>
+        <div style="margin-top: 6px;"><span class="mc-label" data-type="important">중요</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="ds-section">
+  <div class="ds-grid">
+    <div class="ds-h">Button</div>
+    <div style="display: flex; gap: var(--s-2);">
+      <button class="mc-btn mc-btn-primary">저장</button>
+      <button class="mc-btn mc-btn-ghost">취소</button>
+    </div>
+  </div>
+</section>
+
+<section class="ds-section">
+  <div class="ds-grid">
+    <div class="ds-h">Motion · WAAPI 프리미티브</div>
+    <div>
+      <button class="mc-btn mc-btn-ghost" id="demo-fade">FADE-UP (240ms)</button>
+      <button class="mc-btn mc-btn-ghost" id="demo-morph" style="margin-left: 8px;">MEMO → TASK MORPH (300ms)</button>
+      <div id="demo-target" style="margin-top: 16px; padding: var(--s-4); background: var(--surface); border-radius: var(--r-2); border: 1px solid var(--border);">
+        <div style="font-size: 13px; color: var(--muted);">데모 영역 — 위 버튼을 눌러보세요.</div>
+      </div>
+      <pre style="margin-top: 12px; padding: 12px; background: var(--surface-2); border-radius: 6px; font-size: 11px; color: var(--muted); overflow-x: auto;">
+// Memo → Task morph (FR-MEMO-07)
+target.animate([
+  { transform: 'scale(1)',     borderColor: 'var(--border)' },
+  { transform: 'scale(1.04)',  borderColor: 'var(--st-doing)' },
+  { transform: 'scale(1)',     borderColor: 'var(--st-doing)' }
+], { duration: 300, easing: 'cubic-bezier(0.32, 0.72, 0, 1)' });
+      </pre>
+    </div>
+  </div>
+</section>
+
+<section class="ds-section">
+  <div class="ds-grid">
+    <div class="ds-h">Reduced Motion · 접근성</div>
+    <div style="font-size: 13px; color: var(--muted);">
+      <code>prefers-reduced-motion</code> 시 lifecycle pulse·morph 애니메이션 자동 비활성. 정적 시각으로 대체.
+    </div>
+  </div>
+</section>
+
+<footer style="padding: var(--s-6); border-top: 1px solid var(--border); color: var(--muted); font-size: 12px;">
+  MC Design System · v1.5 · 2026-05-06 · 향후 변경은 ADR 등록 후 반영
+</footer>
+
+<script>
+  // FADE-UP demo
+  document.getElementById('demo-fade').onclick = () => {
+    const t = document.getElementById('demo-target');
+    t.animate(
+      [{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'translateY(0)' }],
+      { duration: 240, easing: 'cubic-bezier(0.32, 0.72, 0, 1)' }
+    );
+  };
+  // MORPH demo (memo → task)
+  document.getElementById('demo-morph').onclick = () => {
+    const t = document.getElementById('demo-target');
+    t.animate([
+      { transform: 'scale(1)',    borderColor: 'var(--border)' },
+      { transform: 'scale(1.04)', borderColor: 'oklch(60% 0.18 240)' },
+      { transform: 'scale(1)',    borderColor: 'oklch(60% 0.18 240)' }
+    ], { duration: 300, easing: 'cubic-bezier(0.32, 0.72, 0, 1)' });
+    t.firstElementChild.textContent = '✓ 태스크로 변환됨';
+  };
+</script>
+
+</body>
+</html>

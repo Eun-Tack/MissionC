@@ -1,0 +1,470 @@
+{% extends "base.html" %}
+{% block title %}캘린더 · MC{% endblock %}
+
+{% block head %}
+<style>
+  .page { display: grid; grid-template-rows: 56px 1fr; height: 100vh; }
+  .cal-shell { display: flex; flex-direction: column; height: calc(100vh - 56px); overflow: hidden; }
+  .cal-toolbar { display: flex; align-items: center; gap: 12px; padding: 12px 24px;
+                 border-bottom: 1px solid var(--border); background: var(--bg); flex-shrink: 0; }
+  .cal-label { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
+  .cal-nav { display: flex; gap: 4px; }
+  .cal-nav-btn { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border);
+                 background: transparent; color: var(--fg); font-size: 13px; cursor: pointer; }
+  .cal-nav-btn:hover { background: var(--surface-2); }
+  .mode-group { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .mode-btn { padding: 6px 14px; font-size: 13px; background: transparent; border: none;
+              color: var(--muted); cursor: pointer; transition: all 100ms; }
+  .mode-btn.active { background: var(--brand); color: white; font-weight: 500; }
+  .mode-btn:hover:not(.active) { background: var(--surface-2); color: var(--fg); }
+  .today-btn { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border);
+               background: transparent; color: var(--muted); font-size: 12px; cursor: pointer; }
+  .today-btn:hover { background: var(--surface-2); }
+
+  #cal-grid { flex: 1; overflow: auto; }
+
+  /* Slide-in drawer for item context */
+  #cal-drawer {
+    position: fixed; top: 0; right: 0; bottom: 0; width: 420px;
+    background: var(--surface); border-left: 1px solid var(--border);
+    transform: translateX(100%); transition: transform 280ms var(--ease);
+    z-index: 100; overflow-y: auto;
+    box-shadow: -8px 0 32px oklch(0% 0 0 / 0.08);
+  }
+  #cal-drawer.open { transform: translateX(0); }
+  .drawer-close {
+    position: absolute; top: 12px; right: 12px; z-index: 1;
+    width: 32px; height: 32px; border-radius: 16px; border: none;
+    background: var(--surface-2); color: var(--muted); cursor: pointer;
+    font-size: 16px; display: flex; align-items: center; justify-content: center;
+  }
+  .drawer-close:hover { background: var(--border); color: var(--fg); }
+  #cal-drawer-backdrop {
+    position: fixed; inset: 0; background: oklch(0% 0 0 / 0.2); z-index: 99;
+    opacity: 0; pointer-events: none; transition: opacity 240ms;
+  }
+  #cal-drawer.open + #cal-drawer-backdrop { opacity: 1; pointer-events: auto; }
+
+  /* New event drawer */
+  #new-event-drawer {
+    position: fixed; top: 0; right: 0; bottom: 0; width: 380px;
+    background: var(--surface); border-left: 1px solid var(--border);
+    transform: translateX(100%); transition: transform 280ms var(--ease);
+    z-index: 102; overflow-y: auto;
+    box-shadow: -8px 0 32px oklch(0% 0 0 / 0.1);
+  }
+  #new-event-drawer.open { transform: translateX(0); }
+  #new-event-backdrop {
+    position: fixed; inset: 0; background: oklch(0% 0 0 / 0.2); z-index: 101;
+    opacity: 0; pointer-events: none; transition: opacity 240ms;
+  }
+  #new-event-drawer.open ~ #new-event-backdrop { opacity: 1; pointer-events: auto; }
+
+  .ne-header {
+    padding: 20px 20px 16px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .ne-title { font-size: 16px; font-weight: 700; }
+  .ne-close {
+    width: 28px; height: 28px; border-radius: 14px; border: none;
+    background: var(--surface-2); color: var(--muted); cursor: pointer;
+    font-size: 14px; display: flex; align-items: center; justify-content: center;
+  }
+  .ne-close:hover { background: var(--border); }
+  .ne-body { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+  .ne-field { display: flex; flex-direction: column; gap: 4px; }
+  .ne-label { font-size: 11px; font-weight: 600; color: var(--muted);
+              text-transform: uppercase; letter-spacing: 0.05em; }
+  .ne-input, .ne-select, .ne-textarea {
+    padding: 8px 12px; font-size: 13px; border: 1px solid var(--border);
+    border-radius: 8px; background: var(--bg); color: var(--fg);
+    font-family: inherit; outline: none; transition: border-color 120ms;
+  }
+  .ne-input:focus, .ne-select:focus, .ne-textarea:focus { border-color: var(--brand); }
+  .ne-textarea { min-height: 72px; resize: vertical; }
+  .ne-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .ne-type-seg { display: flex; gap: 4px; }
+  .ne-type-btn {
+    flex: 1; padding: 7px 4px; font-size: 12px; border-radius: 7px;
+    border: 1px solid var(--border); background: var(--bg); color: var(--muted);
+    cursor: pointer; text-align: center; transition: all 100ms;
+  }
+  .ne-type-btn.active { background: var(--brand-soft); color: var(--brand);
+                         border-color: var(--brand); font-weight: 600; }
+  .ne-submit {
+    padding: 11px; background: var(--brand); color: white; border: none;
+    border-radius: 9px; font-size: 14px; font-weight: 600; cursor: pointer;
+    font-family: inherit; transition: filter 100ms; margin-top: 4px;
+  }
+  .ne-submit:hover { filter: brightness(1.1); }
+  .ne-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+  .ne-error { font-size: 12px; color: oklch(50% 0.22 20); padding: 4px 0; }
+
+  /* Add button on day cells */
+  .day-add-btn {
+    display: none; position: absolute; bottom: 6px; right: 6px;
+    width: 20px; height: 20px; border-radius: 10px;
+    background: var(--brand-soft); border: 1px solid var(--brand);
+    color: var(--brand); font-size: 14px; line-height: 1;
+    cursor: pointer; align-items: center; justify-content: center;
+  }
+  .day-col:hover .day-add-btn,
+  .month-cell:hover .day-add-btn { display: flex; }
+  .day-col { position: relative; }
+  .month-cell { position: relative; }
+
+  /* Toolbar add button */
+  .cal-add-btn {
+    padding: 7px 16px; background: var(--brand); color: white; border: none;
+    border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer;
+    font-family: inherit; display: flex; align-items: center; gap: 6px;
+  }
+  .cal-add-btn:hover { filter: brightness(1.1); }
+
+  /* ── Enhanced new-event drawer ── */
+  .ne-title-row { display:flex; align-items:center; gap:8px; }
+  .ne-chk-ind   { font-size:18px; color:var(--muted); flex-shrink:0; user-select:none; line-height:1; margin-top:1px; }
+  .ne-dt-grid   { display:grid; grid-template-columns:38px 1fr 1fr; gap:4px; align-items:center; }
+  .ne-dt-lbl    { font-size:10px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
+  .ne-chk-row   { display:flex; align-items:center; gap:6px; margin-bottom:4px; }
+  .ne-chk-mark  { color:var(--muted); flex-shrink:0; font-size:13px; }
+  .ne-chk-input { flex:1; padding:6px 10px; font-size:12px; border:1px solid var(--border);
+                  border-radius:6px; background:var(--bg); color:var(--fg); font-family:inherit; }
+  .ne-chk-input:focus { outline:none; border-color:var(--brand); }
+  .ne-chk-del   { width:20px; height:20px; border:none; background:none; color:var(--muted);
+                  cursor:pointer; font-size:13px; padding:0; border-radius:3px; flex-shrink:0; }
+  .ne-chk-del:hover { background:var(--surface-2); color:var(--fg); }
+  .ne-add-chk   { font-size:11px; color:var(--brand); background:none; border:none; cursor:pointer;
+                  padding:2px 0; font-family:inherit; font-weight:500; }
+  .ne-add-chk:hover { opacity:.8; }
+  .ne-section-hd { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="page">
+  {% set active_nav = 'calendar' %}
+  {% include "partials/topbar.html" %}
+
+  <div class="cal-shell">
+    <div class="cal-toolbar">
+      <!-- Prev/Next nav -->
+      <div class="cal-nav">
+        <button class="cal-nav-btn"
+                hx-get="/partial/calendar?mode={{ mode }}&date_str={{ prev_anchor }}"
+                hx-target="#cal-grid"
+                hx-swap="innerHTML"
+                hx-push-url="/calendar?mode={{ mode }}&date_str={{ prev_anchor }}">‹</button>
+        <button class="cal-nav-btn"
+                hx-get="/partial/calendar?mode={{ mode }}&date_str={{ next_anchor }}"
+                hx-target="#cal-grid"
+                hx-swap="innerHTML"
+                hx-push-url="/calendar?mode={{ mode }}&date_str={{ next_anchor }}">›</button>
+      </div>
+
+      <span class="cal-label" id="cal-label">{{ label }}</span>
+
+      <button class="today-btn"
+              hx-get="/partial/calendar?mode={{ mode }}&date_str={{ today }}"
+              hx-target="#cal-grid"
+              hx-swap="innerHTML"
+              hx-push-url="/calendar?mode={{ mode }}&date_str={{ today }}">오늘</button>
+
+      <!-- Add event button -->
+      <button class="cal-add-btn" onclick="openNewEvent('{{ today }}')">＋ 일정</button>
+
+      <div class="spacer"></div>
+
+      <!-- Mode switcher -->
+      <div class="mode-group">
+        <button class="mode-btn {{ 'active' if mode == 'day' else '' }}"
+                hx-get="/partial/calendar?mode=day&date_str={{ anchor }}"
+                hx-target="#cal-grid" hx-swap="innerHTML"
+                hx-push-url="/calendar?mode=day&date_str={{ anchor }}">일</button>
+        <button class="mode-btn {{ 'active' if mode == 'week' else '' }}"
+                hx-get="/partial/calendar?mode=week&date_str={{ anchor }}"
+                hx-target="#cal-grid" hx-swap="innerHTML"
+                hx-push-url="/calendar?mode=week&date_str={{ anchor }}">주</button>
+        <button class="mode-btn {{ 'active' if mode == 'month' else '' }}"
+                hx-get="/partial/calendar?mode=month&date_str={{ anchor }}"
+                hx-target="#cal-grid" hx-swap="innerHTML"
+                hx-push-url="/calendar?mode=month&date_str={{ anchor }}">월</button>
+      </div>
+    </div>
+
+    <div id="cal-grid">
+      {% include "partials/calendar_grid.html" %}
+    </div>
+  </div>
+</div>
+
+<!-- Drawer (item context) -->
+<aside id="cal-drawer">
+  <button class="drawer-close" onclick="document.getElementById('cal-drawer').classList.remove('open')">✕</button>
+  <div id="cal-drawer-body" style="padding-top: 4px;">
+    <div style="padding: 60px 20px; text-align:center; color:var(--muted); font-size:13px;">
+      항목을 클릭하면 상세 정보가 표시됩니다
+    </div>
+  </div>
+</aside>
+<div id="cal-drawer-backdrop" onclick="document.getElementById('cal-drawer').classList.remove('open')"></div>
+
+<!-- New Event Drawer -->
+<aside id="new-event-drawer">
+  <div class="ne-header">
+    <span class="ne-title">새 항목 등록</span>
+    <button class="ne-close" onclick="closeNewEvent()">✕</button>
+  </div>
+  <div class="ne-body">
+
+    <!-- Type selector -->
+    <div class="ne-field">
+      <div class="ne-label">유형</div>
+      <div class="ne-type-seg">
+        <button class="ne-type-btn" data-type="schedule" onclick="neSetType('schedule',this)">★ 일정</button>
+        <button class="ne-type-btn active" data-type="task"     onclick="neSetType('task',this)">☐ 할 일</button>
+        <button class="ne-type-btn" data-type="memo"     onclick="neSetType('memo',this)">📝 메모</button>
+      </div>
+      <input type="hidden" id="ne-type" value="task">
+    </div>
+
+    <!-- Title (checkbox indicator shown for task) -->
+    <div class="ne-field">
+      <label class="ne-label" for="ne-title">제목 *</label>
+      <div class="ne-title-row">
+        <span id="ne-chk-ind" class="ne-chk-ind">☐</span>
+        <input class="ne-input" id="ne-title" type="text"
+               placeholder="제목을 입력하세요..."
+               autocomplete="off"
+               onkeydown="if(event.key==='Enter'&&!event.shiftKey)neSubmit()">
+      </div>
+    </div>
+
+    <!-- ★ 일정: start + end datetime -->
+    <div id="ne-block-schedule" style="display:none;">
+      <div class="ne-label" style="margin-bottom:6px;">일시</div>
+      <div class="ne-dt-grid">
+        <span class="ne-dt-lbl">시작</span>
+        <input class="ne-input" id="ne-start-date" type="date">
+        <input class="ne-input" id="ne-start-time" type="time">
+        <span class="ne-dt-lbl">종료</span>
+        <input class="ne-input" id="ne-end-date" type="date">
+        <input class="ne-input" id="ne-end-time" type="time">
+      </div>
+    </div>
+
+    <!-- ☐ 할 일: start date + due date -->
+    <div id="ne-block-task">
+      <div class="ne-row">
+        <div class="ne-field">
+          <label class="ne-label" for="ne-task-sdate">시작일</label>
+          <input class="ne-input" id="ne-task-sdate" type="date">
+        </div>
+        <div class="ne-field">
+          <label class="ne-label" for="ne-task-due">마감일</label>
+          <input class="ne-input" id="ne-task-due" type="date">
+        </div>
+      </div>
+    </div>
+
+    <!-- 📝 메모: optional date -->
+    <div id="ne-block-memo" class="ne-field" style="display:none;">
+      <label class="ne-label" for="ne-memo-date">날짜 (선택)</label>
+      <input class="ne-input" id="ne-memo-date" type="date">
+    </div>
+
+    <!-- Recurrence (schedule + task only) -->
+    <div id="ne-block-recur" class="ne-field">
+      <label class="ne-label" for="ne-recur">반복</label>
+      <select class="ne-select" id="ne-recur">
+        <option value="">반복 없음</option>
+        <option value="DAILY">매일</option>
+        <option value="WEEKDAYS">평일마다</option>
+        <option value="WEEKLY">매주</option>
+        <option value="MONTHLY">매월</option>
+      </select>
+    </div>
+
+    <!-- Project -->
+    <div class="ne-field">
+      <label class="ne-label" for="ne-project">프로젝트</label>
+      <select class="ne-select" id="ne-project">
+        <option value="">— 없음</option>
+        {% for p in projects %}
+        <option value="{{ p.id }}">
+          {%- if p.org_name %}{{ p.org_name }} / {% endif -%}
+          {%- if p.biz_name %}{{ p.biz_name }} / {% endif -%}
+          {{ p.title }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- Notes -->
+    <div class="ne-field">
+      <label class="ne-label" for="ne-body">메모</label>
+      <textarea class="ne-textarea" id="ne-body" placeholder="내용, 장소, 참고사항..."></textarea>
+    </div>
+
+    <!-- Checklist (task only) -->
+    <div id="ne-block-checklist">
+      <div class="ne-section-hd">
+        <span class="ne-label">체크리스트 <span style="font-size:10px;color:var(--muted);font-weight:400;">(선택)</span></span>
+        <button type="button" class="ne-add-chk" onclick="neAddChecklistItem()">+ 추가</button>
+      </div>
+      <div id="ne-chklist"></div>
+    </div>
+
+    <div class="ne-error" id="ne-error"></div>
+    <button class="ne-submit" id="ne-submit-btn" onclick="neSubmit()">등록</button>
+  </div>
+</aside>
+<div id="new-event-backdrop" onclick="closeNewEvent()"></div>
+
+<script>
+  let _neCurrentMode = '{{ mode }}';
+  let _neCurrentAnchor = '{{ anchor }}';
+
+  function neSetType(type, btn) {
+    document.querySelectorAll('.ne-type-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('ne-type').value = type;
+    const isTask  = type === 'task';
+    const isSched = type === 'schedule';
+    const isMemo  = type === 'memo';
+    document.getElementById('ne-chk-ind').style.display          = isTask  ? '' : 'none';
+    document.getElementById('ne-block-schedule').style.display   = isSched ? '' : 'none';
+    document.getElementById('ne-block-task').style.display       = isTask  ? '' : 'none';
+    document.getElementById('ne-block-memo').style.display       = isMemo  ? '' : 'none';
+    document.getElementById('ne-block-recur').style.display      = isMemo  ? 'none' : '';
+    document.getElementById('ne-block-checklist').style.display  = isTask  ? '' : 'none';
+  }
+
+  function openNewEvent(dateStr, timeStr) {
+    ['ne-title','ne-body'].forEach(id => { document.getElementById(id).value = ''; });
+    ['ne-start-date','ne-start-time','ne-end-date','ne-end-time',
+     'ne-task-sdate','ne-task-due','ne-memo-date'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    document.getElementById('ne-recur').value   = '';
+    document.getElementById('ne-project').value = '';
+    document.getElementById('ne-error').textContent = '';
+    document.getElementById('ne-chklist').innerHTML = '';
+    const d = dateStr || '{{ today }}';
+    document.getElementById('ne-start-date').value  = d;
+    document.getElementById('ne-task-sdate').value  = d;
+    document.getElementById('ne-memo-date').value   = d;
+    if (timeStr) document.getElementById('ne-start-time').value = timeStr;
+    neSetType('task', document.querySelector('[data-type="task"]'));
+    document.getElementById('new-event-drawer').classList.add('open');
+    setTimeout(() => document.getElementById('ne-title').focus(), 280);
+  }
+
+  function closeNewEvent() {
+    document.getElementById('new-event-drawer').classList.remove('open');
+  }
+
+  let _neChkCtr = 0;
+  function neAddChecklistItem() {
+    const cid = `ne-chk-${++_neChkCtr}`;
+    const row = document.createElement('div');
+    row.className = 'ne-chk-row'; row.id = cid;
+    row.innerHTML = `
+      <span class="ne-chk-mark">☐</span>
+      <input class="ne-chk-input" type="text" placeholder="항목 이름..."
+             onkeydown="if(event.key==='Enter'){event.preventDefault();neAddChecklistItem();}">
+      <button type="button" class="ne-chk-del"
+              onclick="document.getElementById('${cid}').remove()">✕</button>`;
+    document.getElementById('ne-chklist').appendChild(row);
+    row.querySelector('input').focus();
+  }
+
+  async function neSubmit() {
+    const title = document.getElementById('ne-title').value.trim();
+    if (!title) {
+      document.getElementById('ne-error').textContent = '제목을 입력하세요';
+      document.getElementById('ne-title').focus();
+      return;
+    }
+    const type       = document.getElementById('ne-type').value;
+    const project_id = document.getElementById('ne-project').value;
+    const body       = document.getElementById('ne-body').value.trim();
+    const recurrence = document.getElementById('ne-recur').value;
+
+    let scheduled_at = '', end_at = '', start_date = '', due_date = '';
+    if (type === 'schedule') {
+      const sd = document.getElementById('ne-start-date').value;
+      const st = document.getElementById('ne-start-time').value;
+      const ed = document.getElementById('ne-end-date').value;
+      const et = document.getElementById('ne-end-time').value;
+      if (sd) scheduled_at = st ? `${sd}T${st}:00Z` : `${sd}T00:00:00Z`;
+      if (ed) end_at        = et ? `${ed}T${et}:00Z` : `${ed}T23:59:00Z`;
+    } else if (type === 'task') {
+      start_date = document.getElementById('ne-task-sdate').value;
+      due_date   = document.getElementById('ne-task-due').value;
+      if (start_date)    scheduled_at = `${start_date}T00:00:00Z`;
+      else if (due_date) scheduled_at = `${due_date}T00:00:00Z`;
+    } else {
+      const md = document.getElementById('ne-memo-date').value;
+      if (md) scheduled_at = `${md}T00:00:00Z`;
+    }
+
+    const btn = document.getElementById('ne-submit-btn');
+    btn.disabled = true; btn.textContent = '등록 중...';
+    try {
+      const fd = new FormData();
+      fd.append('title', title); fd.append('type', type);
+      if (scheduled_at) fd.append('scheduled_at', scheduled_at);
+      if (end_at)        fd.append('end_at', end_at);
+      if (start_date)    fd.append('start_date', start_date);
+      if (due_date)      fd.append('due_date', due_date);
+      if (project_id)    fd.append('project_id', project_id);
+      if (body)          fd.append('body', body);
+      if (recurrence)    fd.append('recurrence_rule', recurrence);
+
+      const res = await fetch('/api/items', { method: 'POST', body: fd });
+      if (!res.ok) throw new Error(await res.text());
+      const html = await res.text();
+
+      const match  = html.match(/id="item-(\d+)"/);
+      const itemId = match ? match[1] : null;
+
+      // Create checklist sub-items (tasks with parent_id)
+      if (itemId) {
+        for (const inp of document.querySelectorAll('#ne-chklist .ne-chk-input')) {
+          const ct = inp.value.trim();
+          if (!ct) continue;
+          const cfd = new FormData();
+          cfd.append('title', ct); cfd.append('type', 'task');
+          cfd.append('parent_id', itemId);
+          await fetch('/api/items', { method: 'POST', body: cfd });
+        }
+      }
+
+      closeNewEvent();
+      htmx.ajax('GET',
+        `/partial/calendar?mode=${_neCurrentMode}&date_str=${_neCurrentAnchor}`,
+        { target: '#cal-grid', swap: 'innerHTML' }
+      );
+      if (itemId) {
+        setTimeout(() => {
+          htmx.ajax('GET', `/partial/context/${itemId}`,
+            { target: '#cal-drawer-body', swap: 'innerHTML' });
+          document.getElementById('cal-drawer').classList.add('open');
+        }, 200);
+      }
+    } catch (err) {
+      document.getElementById('ne-error').textContent = '오류: ' + err.message;
+    } finally {
+      btn.disabled = false; btn.textContent = '등록';
+    }
+  }
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      document.getElementById('cal-drawer')?.classList.remove('open');
+      closeNewEvent();
+    }
+  });
+</script>
+{% endblock %}

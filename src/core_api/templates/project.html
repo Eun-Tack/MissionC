@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+{% block title %}{{ proj.title }} · MC{% endblock %}
+
+{% block head %}
+<style>
+  .page   { max-width: 860px; margin: 0 auto; padding: 40px 32px; }
+
+  /* Breadcrumb */
+  .breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 12px;
+                color: var(--muted); margin-bottom: 20px; flex-wrap: wrap; }
+  .breadcrumb a  { color: var(--muted); text-decoration: none; }
+  .breadcrumb a:hover { color: var(--fg); }
+  .breadcrumb .sep { opacity: 0.4; }
+
+  /* Project header */
+  .proj-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 28px; }
+  .proj-color-bar { width: 4px; border-radius: 999px; align-self: stretch; flex-shrink: 0; }
+  .proj-title-area { flex: 1; }
+  .proj-title  { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 6px; }
+  .proj-meta   { display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
+                 font-size: 12px; color: var(--muted); }
+
+  /* Status select */
+  .status-select { padding: 3px 8px; border: 1px solid var(--border); border-radius: 8px;
+                   font-size: 12px; font-weight: 500; background: var(--surface);
+                   color: var(--fg); cursor: pointer; font-family: inherit; }
+  .status-select:focus { outline: none; border-color: var(--brand); }
+
+  /* Stage pipeline */
+  .stages-section { margin-bottom: 32px; }
+  .stages-label   { font-size: 11px; font-weight: 600; text-transform: uppercase;
+                    letter-spacing: 0.08em; color: var(--muted); margin-bottom: 10px; }
+  .stages-row     { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .stage-chip     { font-size: 11px; padding: 4px 10px; border-radius: 999px;
+                    font-family: 'JetBrains Mono', monospace; cursor: pointer;
+                    border: none; transition: all 120ms; }
+  .stage-chip[data-s="pending"] { background: var(--surface-2); color: var(--muted); }
+  .stage-chip[data-s="active"]  { background: var(--brand-soft); color: var(--brand);
+                                   box-shadow: 0 0 0 1px var(--brand); }
+  .stage-chip[data-s="done"]    { background: oklch(94% 0.05 145); color: oklch(35% 0.15 145); }
+  .stage-arrow    { color: var(--border); font-size: 14px; }
+
+  /* Progress */
+  .prog-section  { background: var(--surface); border: 1px solid var(--border);
+                   border-radius: 12px; padding: 16px 20px; margin-bottom: 28px; }
+  .prog-numbers  { display: flex; justify-content: space-between; font-size: 13px;
+                   margin-bottom: 8px; }
+  .prog-bar      { height: 6px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+  .prog-fill     { height: 100%; background: var(--brand); border-radius: 999px;
+                   transition: width 400ms var(--ease); }
+
+  /* Items section */
+  .items-section  { margin-bottom: 32px; }
+  .items-group-h  { font-size: 11px; font-weight: 600; text-transform: uppercase;
+                    letter-spacing: 0.08em; color: var(--muted); margin: 20px 0 8px; }
+  .item-row       { display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+                    background: var(--surface); border: 1px solid var(--border);
+                    border-radius: 10px; margin-bottom: 6px; transition: border-color 120ms; }
+  .item-row:hover { border-color: var(--brand); }
+  .item-dot       { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+                    cursor: pointer; border: none; padding: 0; }
+  .item-dot[data-status="todo"]        { background: none; border: 2px solid var(--muted); }
+  .item-dot[data-status="in_progress"] { background: var(--brand); }
+  .item-dot[data-status="waiting"]     { background: var(--st-waiting); }
+  .item-dot[data-status="done"]        { background: var(--st-done); }
+  .item-title     { font-size: 13px; flex: 1; }
+  .item-row[data-status="done"] .item-title { color: var(--muted); text-decoration: line-through; }
+  .item-date      { font-size: 11px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+  .item-due       { font-size: 11px; color: oklch(50% 0.16 25); font-family: 'JetBrains Mono', monospace;
+                    background: oklch(96% 0.04 25); padding: 1px 6px; border-radius: 4px; }
+  .item-due.overdue { background: oklch(60% 0.21 25); color: white; font-weight: 600; }
+  .item-sub-pct   { font-size: 10px; color: var(--brand); font-family: 'JetBrains Mono', monospace;
+                    background: var(--brand-soft); padding: 1px 6px; border-radius: 4px;
+                    display: inline-flex; align-items: center; gap: 4px; }
+  .item-sub-pct .mini-bar {
+    width: 28px; height: 3px; background: oklch(85% 0.04 280); border-radius: 999px; overflow: hidden;
+  }
+  .item-sub-pct .mini-fill {
+    height: 100%; background: var(--brand); border-radius: 999px; transition: width 300ms;
+  }
+
+  /* GitHub issues */
+  .gh-section  { margin-bottom: 32px; }
+  .gh-label    { font-size: 11px; font-weight: 600; text-transform: uppercase;
+                 letter-spacing: 0.08em; color: var(--muted); margin-bottom: 10px; }
+  .gh-issue-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+                  background: var(--surface); border: 1px solid var(--border);
+                  border-radius: 8px; margin-bottom: 6px; font-size: 13px;
+                  text-decoration: none; color: var(--fg); }
+  .gh-issue-row:hover { border-color: oklch(55% 0.20 250); }
+  .gh-num  { font-family: 'JetBrains Mono', monospace; font-size: 11px;
+             color: var(--muted); flex-shrink: 0; }
+  .gh-pill { font-size: 10px; padding: 2px 6px; border-radius: 999px; font-weight: 600;
+             flex-shrink: 0; }
+  .gh-pill.open   { background: oklch(94% 0.07 145); color: oklch(30% 0.18 145); }
+  .gh-pill.closed { background: var(--surface-2); color: var(--muted); }
+
+  /* Add item form */
+  .add-item-form  { background: var(--surface-2); border: 1px dashed var(--border);
+                    border-radius: 10px; padding: 12px 14px; }
+  .h-input { padding: 7px 11px; border: 1px solid var(--border); border-radius: 8px;
+             background: var(--bg); color: var(--fg); font-size: 13px; font-family: inherit; }
+  .h-input:focus { outline: none; border-color: var(--brand); }
+  .h-btn-primary { padding: 7px 14px; background: var(--brand); color: white; border: none;
+                   border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .h-btn-primary:hover { opacity: 0.9; }
+
+  /* Status colors for project header bar */
+  .color-active   { background: var(--brand); }
+  .color-planning { background: var(--st-waiting); }
+  .color-review   { background: var(--accent); }
+  .color-done     { background: var(--st-done); }
+  .color-paused   { background: var(--muted); }
+
+  /* Folder path */
+  .folder-path-row { display:flex; align-items:center; gap:8px; margin-top:8px;
+                     font-size:11px; color:var(--muted); }
+  .folder-path-text { font-family:'JetBrains Mono',monospace; overflow:hidden;
+                      text-overflow:ellipsis; white-space:nowrap; max-width:320px; }
+  .folder-open-btn { padding:2px 8px; border:1px solid var(--border); border-radius:5px;
+                     background:var(--surface); color:var(--fg); font-size:11px;
+                     cursor:pointer; white-space:nowrap; font-family:inherit; flex-shrink:0; }
+  .folder-open-btn:hover { border-color:var(--brand); color:var(--brand); }
+
+  /* Context drawer */
+  .proj-ctx-drawer  { position:fixed; right:0; top:0; bottom:0; width:400px;
+                      background:var(--bg); border-left:1px solid var(--border);
+                      transform:translateX(100%); transition:transform 280ms var(--ease);
+                      overflow-y:auto; z-index:200; box-shadow:-4px 0 24px oklch(0% 0 0/0.08); }
+  .proj-ctx-drawer.open { transform:translateX(0); }
+  .proj-ctx-overlay { position:fixed; inset:0; background:oklch(0% 0 0/0.22);
+                      opacity:0; pointer-events:none; transition:opacity 280ms; z-index:199; }
+  .proj-ctx-overlay.open { opacity:1; pointer-events:auto; }
+  .item-open-btn { font-size:14px; color:var(--muted); margin-left:auto; flex-shrink:0;
+                   line-height:1; }
+  .item-row:hover .item-open-btn { color:var(--brand); }
+</style>
+{% endblock %}
+
+{% block body %}
+{% set active_nav = 'hierarchy' %}
+{% include "partials/topbar.html" %}
+
+<div class="page">
+
+  <!-- Breadcrumb -->
+  <div class="breadcrumb">
+    <a href="/hierarchy">Hierarchy</a>
+    {% if proj.org_name %}
+    <span class="sep">›</span>
+    <span>{{ proj.org_name }}</span>
+    {% endif %}
+    {% if proj.biz_name %}
+    <span class="sep">›</span>
+    <span>{{ proj.biz_name }}</span>
+    {% endif %}
+    <span class="sep">›</span>
+    <span style="color:var(--fg);">{{ proj.title }}</span>
+  </div>
+
+  <!-- Project header -->
+  <div class="proj-header">
+    <div class="proj-color-bar color-{{ proj.status }}"></div>
+    <div class="proj-title-area">
+      <div class="proj-title">{{ proj.title }}</div>
+      <div class="proj-meta">
+        <!-- Status changer -->
+        <select class="status-select" id="proj-status-{{ proj.id }}"
+                onchange="updateProjStatus({{ proj.id }}, this.value)">
+          {% for s in valid_statuses %}
+          <option value="{{ s }}" {% if s == proj.status %}selected{% endif %}>
+            {{ status_labels[s] }}
+          </option>
+          {% endfor %}
+        </select>
+        {% if proj.start_date or proj.end_date %}
+        <span>📅 {{ proj.start_date or '—' }} → {{ proj.end_date or '계속' }}</span>
+        {% endif %}
+        {% if proj.github_repo %}
+        <a href="https://github.com/{{ proj.github_repo }}" target="_blank"
+           style="color:var(--muted); text-decoration:none;">🐙 {{ proj.github_repo }}</a>
+        {% endif %}
+        {% if proj.vision %}
+        <span style="font-style:italic;">{{ proj.vision }}</span>
+        {% endif %}
+      </div>
+      {% if proj.folder_path %}
+      <div class="folder-path-row">
+        📁
+        <span class="folder-path-text" title="{{ proj.folder_path }}">{{ proj.folder_path }}</span>
+        <button class="folder-open-btn"
+                onclick="fetch('/api/folder-open?path=' + encodeURIComponent('{{ proj.folder_path }}'))">
+          Explorer에서 열기
+        </button>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Stages -->
+  {% if stages %}
+  <div class="stages-section">
+    <div class="stages-label">단계</div>
+    <div class="stages-row">
+      {% for s in stages %}
+      {% if not loop.first %}<span class="stage-arrow">›</span>{% endif %}
+      <button class="stage-chip" data-s="{{ s.status }}" id="stage-{{ s.id }}"
+              hx-patch="/api/stages/{{ s.id }}/status"
+              hx-vals='{"status": "{{ {"pending":"active","active":"done","done":"pending"}[s.status] }}"}'
+              hx-target="#stage-{{ s.id }}"
+              hx-swap="outerHTML"
+              title="클릭하여 상태 변경">
+        {% if s.status == "done" %}✓ {% elif s.status == "active" %}● {% endif %}{{ s.name }}
+      </button>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Progress -->
+  <div class="prog-section">
+    <div class="prog-numbers">
+      <span>{{ done_count }} / {{ item_count }} 완료</span>
+      <span style="font-weight:600;">{{ progress_pct }}%</span>
+    </div>
+    <div class="prog-bar">
+      <div class="prog-fill" style="width:{{ progress_pct }}%;"></div>
+    </div>
+  </div>
+
+  <!-- GitHub Issues (FR-GIT-04) -->
+  {% if github_issues %}
+  <div class="gh-section">
+    <div class="gh-label">🐙 GitHub 오픈 이슈 · {{ proj.github_repo }}</div>
+    {% for issue in github_issues %}
+    <a href="{{ issue.html_url }}" target="_blank" class="gh-issue-row">
+      <span class="gh-num">#{{ issue.number }}</span>
+      <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ issue.title }}</span>
+      <span class="gh-pill {{ issue.state }}">{{ '열림' if issue.state == 'open' else '닫힘' }}</span>
+    </a>
+    {% endfor %}
+  </div>
+  {% elif proj.github_repo %}
+  <div style="font-size:12px; color:var(--muted); margin-bottom:24px;">
+    🐙 {{ proj.github_repo }} · 캐시된 이슈 없음 (15분마다 갱신)
+  </div>
+  {% endif %}
+
+  <!-- Items (loaded via partial) -->
+  <div class="items-section" id="proj-items"
+       hx-get="/partial/project/{{ proj.id }}/items"
+       hx-trigger="load"
+       hx-swap="innerHTML">
+    <div style="text-align:center; padding:24px; color:var(--muted); font-size:13px;">로딩 중…</div>
+  </div>
+
+  <!-- Add item -->
+  <div class="add-item-form">
+    <form id="proj-add-form"
+          hx-post="/api/items"
+          hx-swap="none"
+          hx-on::after-request="htmx.ajax('GET', '/partial/project/{{ proj.id }}/items', {target: '#proj-items', swap: 'innerHTML'}); document.getElementById('proj-add-form').reset();"
+          style="display:flex; gap:8px; align-items:center;">
+      <input type="hidden" name="project_id" value="{{ proj.id }}">
+      <input class="h-input" type="text" name="title"
+             placeholder="새 할 일 추가..." style="flex:1;" autocomplete="off">
+      <button type="submit" class="h-btn-primary">+ 추가</button>
+    </form>
+  </div>
+
+</div>
+
+<!-- Context drawer -->
+<div class="proj-ctx-overlay" id="proj-ctx-overlay" onclick="closeProjCtx()"></div>
+<aside class="proj-ctx-drawer" id="proj-ctx-drawer">
+  <div id="proj-ctx-body"></div>
+</aside>
+
+<script>
+async function updateProjStatus(projId, status) {
+  const fd = new FormData();
+  fd.append('status', status);
+  await fetch('/api/projects/' + projId + '/status', {method: 'PATCH', body: fd});
+  const bar = document.querySelector('.proj-color-bar');
+  if (bar) bar.className = 'proj-color-bar color-' + status;
+}
+
+async function toggleProjItem(btn, itemId, projId) {
+  const cur = btn.getAttribute('data-status');
+  const next = cur === 'done' ? 'todo' : 'done';
+  const fd = new FormData();
+  fd.append('status', next);
+  const r = await fetch('/api/items/' + itemId, {method: 'PATCH', body: fd});
+  if (r.ok) {
+    htmx.ajax('GET', '/partial/project/' + projId + '/items', {target: '#proj-items', swap: 'innerHTML'});
+  }
+}
+
+function openProjCtx(itemId) {
+  htmx.ajax('GET', '/partial/context/' + itemId, {target: '#proj-ctx-body', swap: 'innerHTML'});
+  document.getElementById('proj-ctx-drawer').classList.add('open');
+  document.getElementById('proj-ctx-overlay').classList.add('open');
+}
+
+function closeProjCtx() {
+  document.getElementById('proj-ctx-drawer').classList.remove('open');
+  document.getElementById('proj-ctx-overlay').classList.remove('open');
+}
+
+</script>
+{% endblock %}

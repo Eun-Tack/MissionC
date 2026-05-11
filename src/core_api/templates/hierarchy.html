@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}Hierarchy · MC{% endblock %}
+
+{% block head %}
+<style>
+  .page { max-width: 1100px; margin: 0 auto; padding: 40px 32px; }
+
+  .page-h { font-size: 26px; font-weight: 800; letter-spacing: -0.02em;
+            margin-bottom: 32px; display: flex; align-items: center; gap: 12px; }
+  .page-h span { color: var(--muted); font-weight: 400; font-size: 14px; }
+
+  /* Org section */
+  .org-section { margin-bottom: 48px; }
+  .org-header  { display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
+                 padding-bottom: 12px; border-bottom: 2px solid var(--border); }
+  .org-logo    { width: 36px; height: 36px; border-radius: 10px; display: flex;
+                 align-items: center; justify-content: center; font-size: 18px;
+                 font-weight: 800; color: white; flex-shrink: 0; }
+  .org-name    { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
+  .org-meta    { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  /* Business block */
+  .biz-block  { margin-bottom: 24px; padding-left: 24px;
+                border-left: 2px dashed var(--border); }
+  .biz-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .biz-name   { font-size: 14px; font-weight: 600; color: var(--fg); }
+  .biz-desc   { font-size: 12px; color: var(--muted); }
+  .icon-btn   { background: none; border: none; color: var(--muted); cursor: pointer;
+                font-size: 18px; padding: 0 4px; line-height: 1; border-radius: 4px; }
+  .icon-btn:hover { color: oklch(55% 0.21 25); background: oklch(97% 0.02 25); }
+
+  /* Project cards */
+  .proj-grid  { display: grid; gap: 10px;
+                grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+                margin-bottom: 10px; }
+  .proj-card-wrap { position: relative; }
+  .proj-card  { background: var(--surface); border: 1px solid var(--border);
+                border-radius: 12px; padding: 16px; position: relative; overflow: hidden;
+                transition: all 200ms var(--ease); text-decoration: none; color: inherit;
+                display: block; }
+  .proj-card:hover { transform: translateY(-1px); border-color: var(--brand);
+                     box-shadow: 0 4px 16px oklch(0% 0 0 / 0.06); }
+  .proj-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+                       width: 3px; border-radius: 999px 0 0 999px; }
+  .proj-card[data-status="active"]::before   { background: var(--brand); }
+  .proj-card[data-status="planning"]::before { background: var(--st-waiting); }
+  .proj-card[data-status="review"]::before   { background: var(--accent); }
+  .proj-card[data-status="done"]::before     { background: var(--st-done); }
+  .proj-card[data-status="paused"]::before   { background: var(--muted); }
+
+  .proj-archive-btn { position: absolute; top: 8px; right: 8px; background: none;
+                      border: none; color: var(--muted); cursor: pointer; font-size: 16px;
+                      padding: 2px 6px; border-radius: 4px; opacity: 0;
+                      transition: opacity 120ms; }
+  .proj-card-wrap:hover .proj-archive-btn { opacity: 1; }
+  .proj-archive-btn:hover { color: var(--fg); background: var(--surface-2); }
+
+  .proj-title  { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; padding-right: 20px; }
+  .proj-dates  { font-size: 11px; color: var(--muted); margin-top: 3px;
+                 font-family: 'JetBrains Mono', monospace; }
+  .proj-progress { margin-top: 10px; }
+  .prog-bar    { height: 3px; background: var(--surface-2); border-radius: 999px;
+                 overflow: hidden; margin-top: 4px; }
+  .prog-fill   { height: 100%; border-radius: 999px; transition: width 400ms var(--ease); }
+  .prog-fill[data-status="active"]   { background: var(--brand); }
+  .prog-fill[data-status="planning"] { background: var(--st-waiting); }
+  .prog-fill[data-status="review"]   { background: var(--accent); }
+  .prog-fill[data-status="done"]     { background: var(--st-done); }
+  .prog-fill[data-status="paused"]   { background: var(--muted); }
+  .proj-footer { display: flex; gap: 6px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+
+  .stage-chip { font-size: 10px; padding: 2px 7px; border-radius: 999px;
+                font-family: 'JetBrains Mono', monospace; }
+  .stage-chip[data-s="pending"] { background: var(--surface-2); color: var(--muted); }
+  .stage-chip[data-s="active"]  { background: var(--brand-soft); color: var(--brand);
+                                   box-shadow: 0 0 0 1px var(--brand); }
+  .stage-chip[data-s="done"]    { background: oklch(94% 0.05 145); color: oklch(35% 0.15 145); }
+
+  .status-badge { font-size: 10px; padding: 2px 8px; border-radius: 999px; font-weight: 500; }
+  .status-badge[data-s="active"]   { background: var(--brand-soft); color: var(--brand); }
+  .status-badge[data-s="planning"] { background: oklch(96% 0.05 80); color: oklch(40% 0.18 80); }
+  .status-badge[data-s="review"]   { background: oklch(94% 0.05 200); color: oklch(35% 0.15 200); }
+  .status-badge[data-s="done"]     { background: oklch(94% 0.05 145); color: oklch(35% 0.15 145); }
+  .status-badge[data-s="paused"]   { background: var(--surface-2); color: var(--muted); }
+
+  .github-link { font-size: 11px; color: var(--muted); text-decoration: none;
+                 display: inline-flex; align-items: center; gap: 3px; }
+  .github-link:hover { color: var(--brand); }
+
+  /* Unaffiliated */
+  .unaffiliated   { margin-top: 32px; padding-top: 24px; border-top: 1px dashed var(--border); }
+  .unaffiliated-h { font-size: 11px; font-weight: 600; text-transform: uppercase;
+                    letter-spacing: 0.08em; color: var(--muted); margin-bottom: 12px; }
+
+  /* Inline add forms (shared) */
+  .add-inline-form { background: var(--surface-2); border: 1px solid var(--border);
+                     border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
+  .h-input  { padding: 7px 11px; border: 1px solid var(--border); border-radius: 8px;
+              background: var(--bg); color: var(--fg); font-size: 13px;
+              font-family: inherit; }
+  .h-input:focus { outline: none; border-color: var(--brand); }
+  .h-btn-primary { padding: 7px 14px; background: var(--brand); color: white; border: none;
+                   border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .h-btn-primary:hover { opacity: 0.9; }
+  .h-btn-ghost  { padding: 7px 12px; background: none; border: 1px solid var(--border);
+                  border-radius: 8px; font-size: 12px; cursor: pointer; color: var(--muted); }
+  .h-btn-ghost:hover { color: var(--fg); border-color: var(--fg); }
+  .h-btn-add    { background: none; border: 1px dashed var(--border); border-radius: 8px;
+                  padding: 5px 12px; font-size: 12px; color: var(--muted); cursor: pointer;
+                  margin-bottom: 8px; }
+  .h-btn-add:hover { border-color: var(--brand); color: var(--brand); }
+</style>
+{% endblock %}
+
+{% block body %}
+{% set active_nav = 'hierarchy' %}
+{% include "partials/topbar.html" %}
+
+<div class="page">
+  <div class="page-h">
+    조직 계층
+    <span>{{ orgs|length }}개 소속 · {{ total_projects }}개 프로젝트</span>
+  </div>
+
+  {% for org in orgs %}
+  {% include "partials/org_section.html" %}
+  {% endfor %}
+
+  {% if unaffiliated %}
+  <div class="unaffiliated">
+    <div class="unaffiliated-h">📁 무소속 프로젝트</div>
+    <div class="proj-grid">
+      {% for p in unaffiliated %}
+      <a class="proj-card" href="/project/{{ p.id }}" data-status="{{ p.status }}">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+          <div class="proj-title">{{ p.title }}</div>
+          <span class="status-badge" data-s="{{ p.status }}">
+            {{ {'active':'진행중','planning':'기획','review':'검토','done':'완료','paused':'중단'}.get(p.status, p.status) }}
+          </span>
+        </div>
+        {% if p.item_count > 0 %}
+        <div class="proj-progress" style="margin-top:8px;">
+          <div class="prog-bar">
+            <div class="prog-fill" data-status="{{ p.status }}" style="width:{{ p.progress_pct }}%;"></div>
+          </div>
+        </div>
+        {% endif %}
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+<script>
+function toggleAddForm(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const showing = el.style.display !== 'none';
+  el.style.display = showing ? 'none' : 'block';
+  if (!showing) {
+    const first = el.querySelector('input[type=text]');
+    if (first) first.focus();
+  }
+}
+</script>
+{% endblock %}

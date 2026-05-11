@@ -1,0 +1,373 @@
+{% extends "base.html" %}
+{% block title %}초기 설정 · MC{% endblock %}
+
+{% block head %}
+<style>
+  body { display: flex; align-items: center; justify-content: center;
+         min-height: 100vh; padding: 24px; }
+
+  .wizard { width: 100%; max-width: 560px; }
+
+  /* Progress bar */
+  .progress { display: flex; gap: 6px; margin-bottom: 40px; }
+  .step-dot  { flex: 1; height: 3px; border-radius: 999px; background: var(--border);
+               transition: background 300ms; }
+  .step-dot.active   { background: var(--brand); }
+  .step-dot.done     { background: var(--st-done); }
+
+  /* Card */
+  .card { background: var(--surface); border: 1px solid var(--border);
+          border-radius: 20px; padding: 36px; }
+  .card-icon  { font-size: 36px; margin-bottom: 12px; }
+  .card-title { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 6px; }
+  .card-sub   { font-size: 14px; color: var(--muted); margin-bottom: 28px; line-height: 1.5; }
+
+  /* Form elements */
+  .field        { margin-bottom: 16px; }
+  .field-label  { font-size: 12px; font-weight: 600; color: var(--muted);
+                  text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+  .field-input  { width: 100%; padding: 10px 14px; border: 1px solid var(--border);
+                  border-radius: 10px; background: var(--bg); color: var(--fg);
+                  font-size: 14px; font-family: inherit; transition: border-color 120ms; }
+  .field-input:focus { outline: none; border-color: var(--brand); }
+
+  .folder-row { display: flex; gap: 8px; }
+  .folder-row .field-input { flex: 1; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+  .pick-btn  { padding: 10px 14px; background: var(--surface-2); border: 1px solid var(--border);
+               border-radius: 10px; cursor: pointer; font-size: 13px; white-space: nowrap;
+               color: var(--fg); transition: border-color 120ms; flex-shrink: 0; }
+  .pick-btn:hover { border-color: var(--brand); }
+
+  /* Color swatches */
+  .color-row   { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+  .color-swatch { width: 28px; height: 28px; border-radius: 8px; cursor: pointer;
+                  border: 2px solid transparent; transition: all 120ms; }
+  .color-swatch:has(input:checked) { border-color: var(--fg); transform: scale(1.15); }
+  .color-swatch input { display: none; }
+
+  /* Credential row */
+  .cred-field  { display: flex; gap: 8px; align-items: flex-start; }
+  .cred-field .field-input { flex: 1; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+  .cred-actions { display: flex; gap: 6px; flex-direction: column; min-width: 80px; }
+
+  /* Service card */
+  .service-card { border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px;
+                  margin-bottom: 12px; background: var(--bg); }
+  .service-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .service-icon   { font-size: 20px; }
+  .service-name   { font-size: 14px; font-weight: 600; }
+  .service-desc   { font-size: 11px; color: var(--muted); }
+  .service-badge  { margin-left: auto; font-size: 11px; padding: 2px 8px; border-radius: 999px; }
+  .service-badge.set    { background: oklch(94% 0.05 145); color: oklch(35% 0.15 145); }
+  .service-badge.notset { background: var(--surface-2); color: var(--muted); }
+
+  /* Buttons */
+  .btn-primary { width: 100%; padding: 14px; background: var(--brand); color: white;
+                 border: none; border-radius: 12px; font-size: 15px; font-weight: 600;
+                 cursor: pointer; transition: opacity 120ms; margin-top: 8px; }
+  .btn-primary:hover { opacity: 0.9; }
+  .btn-ghost   { width: 100%; padding: 12px; background: transparent; color: var(--muted);
+                 border: 1px solid var(--border); border-radius: 12px; font-size: 14px;
+                 cursor: pointer; margin-top: 6px; transition: all 120ms; }
+  .btn-ghost:hover { color: var(--fg); border-color: var(--fg); }
+  .btn-small   { padding: 6px 12px; background: var(--surface-2); border: 1px solid var(--border);
+                 border-radius: 8px; font-size: 12px; cursor: pointer; color: var(--fg);
+                 transition: border-color 120ms; white-space: nowrap; }
+  .btn-small:hover { border-color: var(--brand); }
+
+  /* Inline add org form */
+  .add-org-form { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap;
+                  padding: 14px; background: var(--surface-2); border-radius: 12px;
+                  margin-bottom: 12px; }
+  .add-org-form .field-input { flex: 1; min-width: 160px; }
+
+  /* Done card */
+  .done-item { display: flex; align-items: center; gap: 10px; padding: 10px 0;
+               border-bottom: 1px solid var(--border); font-size: 13px; }
+  .done-item:last-child { border-bottom: none; }
+  .done-check { color: var(--st-done); font-size: 16px; }
+  .done-skip  { color: var(--muted); font-size: 16px; }
+
+  /* Logo */
+  .mc-logo { text-align: center; font-size: 32px; font-weight: 900; color: var(--brand);
+             letter-spacing: -0.03em; margin-bottom: 32px; }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="wizard">
+
+  <div class="mc-logo">MC</div>
+
+  <!-- Progress -->
+  <div class="progress">
+    <div class="step-dot {% if step >= 1 %}{% if step > 1 %}done{% else %}active{% endif %}{% endif %}"></div>
+    <div class="step-dot {% if step >= 2 %}{% if step > 2 %}done{% else %}active{% endif %}{% endif %}"></div>
+    <div class="step-dot {% if step >= 3 %}{% if step > 3 %}done{% else %}active{% endif %}{% endif %}"></div>
+    <div class="step-dot {% if step >= 4 %}active{% endif %}"></div>
+  </div>
+
+  <!-- ── Step 1: 폴더 설정 ─────────────────────────────────────── -->
+  {% if step == 1 %}
+  <div class="card">
+    <div class="card-icon">📁</div>
+    <div class="card-title">MC-Notes 폴더를 선택해주세요</div>
+    <div class="card-sub">
+      메모, 프로젝트 파일이 저장될 로컬 폴더입니다.<br>
+      Google Drive for Desktop 동기화 폴더를 선택하면 자동으로 클라우드 백업됩니다.
+    </div>
+
+    <form hx-post="/setup/step/folder" hx-target="body" hx-swap="innerHTML">
+      <div class="field">
+        <div class="field-label">폴더 경로</div>
+        <div class="folder-row">
+          <input id="notes-root-input" class="field-input" type="text" name="notes_root"
+                 value="{{ notes_root or '' }}"
+                 placeholder="{{ '~/Documents/MC-Notes' }}"
+                 autocomplete="off">
+          <button type="button" class="pick-btn"
+                  onclick="pickFolder(this)">
+            📂 찾아보기
+          </button>
+        </div>
+        <div style="font-size:11px; color:var(--muted); margin-top:6px;">
+          비워두면 <code>~/Documents/MC-Notes</code>를 사용합니다.
+        </div>
+      </div>
+
+      <button type="submit" class="btn-primary">다음 →</button>
+    </form>
+  </div>
+
+  <!-- ── Step 2: 소속 등록 ─────────────────────────────────────── -->
+  {% elif step == 2 %}
+  <div class="card">
+    <div class="card-icon">🏢</div>
+    <div class="card-title">소속을 등록해주세요</div>
+    <div class="card-sub">
+      조직, 회사, 팀 등 소속을 입력합니다.<br>
+      나중에 설정에서 언제든 추가·수정할 수 있습니다.
+    </div>
+
+    <!-- Add org inline form -->
+    <div class="add-org-form">
+      <div style="flex:1; min-width:160px;">
+        <div class="field-label" style="margin-bottom:4px;">소속 이름</div>
+        <input id="org-name-input" class="field-input" type="text" placeholder="예: 플링크데이터" autocomplete="off">
+      </div>
+      <div>
+        <div class="field-label" style="margin-bottom:4px;">색상</div>
+        <div class="color-row" id="color-picker">
+          {% for color, label in org_colors %}
+          <label class="color-swatch" style="background:{{ color }};" title="{{ label }}">
+            <input type="radio" name="org-color" value="{{ color }}" {% if loop.first %}checked{% endif %}>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <button type="button" class="btn-small" style="align-self:flex-end; margin-bottom:1px;"
+              onclick="addOrg()">+ 추가</button>
+    </div>
+
+    <!-- Org list (htmx target) -->
+    {% include "partials/org_list.html" %}
+
+    <form hx-post="/setup/step/orgs" hx-target="body" hx-swap="innerHTML" style="margin-top:20px;">
+      <button type="submit" class="btn-primary">다음 →</button>
+      <button type="submit" class="btn-ghost">건너뛰기</button>
+    </form>
+  </div>
+
+  <!-- ── Step 3: 연동 설정 ─────────────────────────────────────── -->
+  {% elif step == 3 %}
+  <div class="card">
+    <div class="card-icon">🔗</div>
+    <div class="card-title">외부 서비스 연동</div>
+    <div class="card-sub">
+      토큰은 Windows Credential Manager에 안전하게 저장됩니다.<br>
+      모두 선택사항입니다. 나중에 설정에서 언제든 변경할 수 있습니다.
+    </div>
+
+    <!-- GitHub -->
+    <div class="service-card">
+      <div class="service-header">
+        <span class="service-icon">🐙</span>
+        <div>
+          <div class="service-name">GitHub</div>
+          <div class="service-desc">이슈·PR 조회, 진척도 연동</div>
+        </div>
+        <span class="service-badge {% if gh_set %}set{% else %}notset{% endif %}">
+          {% if gh_set %}연결됨{% else %}미설정{% endif %}
+        </span>
+      </div>
+      <div class="cred-field">
+        <input class="field-input" type="password" id="gh-token"
+               placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off">
+        <div class="cred-actions">
+          <button type="button" class="btn-small"
+                  onclick="saveCredential('gh', document.getElementById('gh-token').value, this)">
+            저장
+          </button>
+          <span id="gh-test-result" style="font-size:11px;"></span>
+          <button type="button" class="btn-small"
+                  hx-get="/settings/test/gh"
+                  hx-target="#gh-test-result">테스트</button>
+        </div>
+      </div>
+      <div style="margin-top:8px; font-size:11px; color:var(--muted);">
+        <a href="https://github.com/settings/tokens/new?scopes=repo,read:user" target="_blank"
+           style="color:var(--brand);">PAT 발급하기 →</a>
+        (repo, read:user 권한 필요)
+      </div>
+    </div>
+
+    <!-- Telegram -->
+    <div class="service-card">
+      <div class="service-header">
+        <span class="service-icon">✈️</span>
+        <div>
+          <div class="service-name">Telegram Bot</div>
+          <div class="service-desc">모바일 빠른캡처, 알림 수신</div>
+        </div>
+        <span class="service-badge {% if tg_set %}set{% else %}notset{% endif %}">
+          {% if tg_set %}연결됨{% else %}미설정{% endif %}
+        </span>
+      </div>
+      <div class="cred-field">
+        <input class="field-input" type="password" id="tg-token"
+               placeholder="1234567890:AAAAAAAAAA..." autocomplete="off">
+        <div class="cred-actions">
+          <button type="button" class="btn-small"
+                  onclick="saveCredential('tg', document.getElementById('tg-token').value, this)">
+            저장
+          </button>
+          <span id="tg-test-result" style="font-size:11px;"></span>
+          <button type="button" class="btn-small"
+                  hx-get="/settings/test/tg"
+                  hx-target="#tg-test-result">테스트</button>
+        </div>
+      </div>
+      <div style="margin-top:8px; font-size:11px; color:var(--muted);">
+        @BotFather에서 /newbot으로 봇 생성 후 토큰 발급
+      </div>
+    </div>
+
+    <!-- Google Calendar -->
+    <div class="service-card" style="opacity:0.7;">
+      <div class="service-header">
+        <span class="service-icon">🗓</span>
+        <div>
+          <div class="service-name">Google Calendar</div>
+          <div class="service-desc">일정 자동 동기화 (OAuth 2.0)</div>
+        </div>
+        <span class="service-badge {% if gcal_set %}set{% else %}notset{% endif %}">
+          {% if gcal_set %}연결됨{% else %}미설정{% endif %}
+        </span>
+      </div>
+      <div style="font-size:12px; color:var(--muted); padding:4px 0;">
+        설정 → Google Calendar에서 OAuth 설정 가능합니다. (현재는 건너뜁니다)
+      </div>
+    </div>
+
+    <form hx-post="/setup/step/integrations" hx-target="body" hx-swap="innerHTML" style="margin-top:8px;">
+      <button type="submit" class="btn-primary">다음 →</button>
+    </form>
+  </div>
+
+  <!-- ── Step 4: 완료 ─────────────────────────────────────────── -->
+  {% elif step == 4 %}
+  <div class="card" style="text-align:center;">
+    <div style="font-size:48px; margin-bottom:16px;">✦</div>
+    <div class="card-title">설정 완료!</div>
+    <div class="card-sub">MC를 사용할 준비가 되었습니다.</div>
+
+    <div style="text-align:left; margin: 24px 0; padding: 16px;
+                background:var(--surface-2); border-radius:12px;">
+      <div class="done-item">
+        <span class="{% if notes_root %}done-check{% else %}done-skip{% endif %}">
+          {% if notes_root %}✓{% else %}—{% endif %}
+        </span>
+        <span>MC-Notes 폴더
+          {% if notes_root %}<span style="color:var(--muted); font-family:monospace; font-size:11px;">{{ notes_root }}</span>{% else %}(기본값 사용){% endif %}
+        </span>
+      </div>
+      <div class="done-item">
+        <span class="{% if orgs %}done-check{% else %}done-skip{% endif %}">
+          {% if orgs %}✓{% else %}—{% endif %}
+        </span>
+        <span>소속 {{ orgs|length }}개 등록</span>
+      </div>
+      <div class="done-item">
+        <span class="{% if gh_set %}done-check{% else %}done-skip{% endif %}">
+          {% if gh_set %}✓{% else %}—{% endif %}
+        </span>
+        <span>GitHub {% if gh_set %}연결됨{% else %}(건너뜀){% endif %}</span>
+      </div>
+      <div class="done-item">
+        <span class="{% if tg_set %}done-check{% else %}done-skip{% endif %}">
+          {% if tg_set %}✓{% else %}—{% endif %}
+        </span>
+        <span>Telegram {% if tg_set %}연결됨{% else %}(건너뜀){% endif %}</span>
+      </div>
+    </div>
+
+    <form action="/setup/complete" method="post">
+      <button type="submit" class="btn-primary" style="font-size:16px;">
+        Flow 시작하기 →
+      </button>
+    </form>
+    <div style="margin-top:12px; font-size:12px; color:var(--muted);">
+      나중에 <a href="/settings" style="color:var(--brand);">설정</a>에서 언제든 변경할 수 있습니다.
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+<script>
+function pickFolder(btn) {
+  const input = document.getElementById('notes-root-input');
+  const current = input ? input.value : '';
+  btn.textContent = '...';
+  fetch('/api/pick-folder?current=' + encodeURIComponent(current))
+    .then(r => r.json())
+    .then(d => {
+      if (d.path && input) input.value = d.path;
+    })
+    .finally(() => { btn.textContent = '📂 찾아보기'; });
+}
+
+// Add org via fetch
+function addOrg() {
+  const name = document.getElementById('org-name-input').value.trim();
+  if (!name) { alert('이름을 입력해주세요'); return; }
+  const color = document.querySelector('input[name="org-color"]:checked')?.value || 'oklch(58% 0.18 280)';
+  const fd = new FormData();
+  fd.append('name', name);
+  fd.append('color', color);
+  fetch('/settings/org', { method: 'POST', body: fd })
+    .then(r => r.text())
+    .then(html => {
+      document.getElementById('org-list').outerHTML = html;
+      document.getElementById('org-name-input').value = '';
+    });
+}
+
+// Save credential via fetch
+function saveCredential(service, token, btn) {
+  if (!token.trim()) { alert('토큰을 입력해주세요'); return; }
+  btn.textContent = '저장중...';
+  const fd = new FormData();
+  fd.append('service', service);
+  fd.append('token', token);
+  fetch('/settings/credential', { method: 'POST', body: fd })
+    .then(r => r.text())
+    .then(html => {
+      const result = document.getElementById(`cred-${service}-result`);
+      if (result) result.outerHTML = html;
+      btn.textContent = '저장';
+    })
+    .catch(() => { btn.textContent = '저장'; });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% block title %}대시보드 · MC{% endblock %}
+
+{% block head %}
+<style>
+  .page { display: grid; grid-template-rows: 56px 1fr; height: 100vh; }
+  .content { padding: 28px 40px; overflow-y: auto; }
+
+  /* KPI row */
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+  .kpi-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 20px 22px;
+  }
+  .kpi-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
+               color: var(--muted); font-weight: 600; margin-bottom: 8px; }
+  .kpi-value { font-size: 32px; font-weight: 800; letter-spacing: -0.03em;
+               line-height: 1; }
+  .kpi-sub   { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .kpi-card.highlight { border-color: var(--brand); background: var(--brand-soft); }
+  .kpi-card.highlight .kpi-value { color: var(--brand); }
+  .kpi-card.warn { border-color: oklch(75% 0.16 25); background: oklch(97% 0.02 25); }
+  .kpi-card.warn .kpi-value { color: oklch(55% 0.21 25); }
+
+  /* Section title */
+  .sec-title { font-size: 13px; font-weight: 700; text-transform: uppercase;
+               letter-spacing: 0.06em; color: var(--muted); margin-bottom: 16px; }
+
+  /* Weekly bar chart */
+  .week-chart {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 20px 24px; margin-bottom: 28px;
+  }
+  .week-bars {
+    display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px;
+    align-items: end; height: 120px;
+  }
+  .week-bar-col { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .week-bar-wrap {
+    flex: 1; width: 100%; display: flex; flex-direction: column;
+    justify-content: flex-end; min-height: 8px;
+  }
+  .week-bar {
+    width: 100%; border-radius: 5px 5px 0 0; transition: height 400ms var(--ease);
+    position: relative; min-height: 4px;
+  }
+  .week-bar .bar-done {
+    background: var(--brand); border-radius: 5px 5px 0 0; width: 100%;
+    position: absolute; bottom: 0;
+  }
+  .week-bar .bar-todo {
+    background: var(--brand-soft); border-radius: 5px 5px 0 0; width: 100%;
+  }
+  .week-bar-label { font-size: 10px; color: var(--muted); font-weight: 600; }
+  .week-bar-date  { font-size: 9px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+  .week-bar-pct   { font-size: 9px; color: var(--brand); font-weight: 700;
+                    font-family: 'JetBrains Mono', monospace; }
+
+  /* Projects table */
+  .proj-grid {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; overflow: hidden; margin-bottom: 28px;
+  }
+  .proj-row {
+    display: grid; grid-template-columns: 1fr 80px 120px 50px;
+    gap: 12px; align-items: center; padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    transition: background 80ms;
+  }
+  .proj-row:last-child { border-bottom: 0; }
+  .proj-row:hover { background: var(--surface-2); }
+  .proj-row-head { background: var(--surface-2); font-size: 10px; font-weight: 600;
+                   text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+  .proj-title { font-size: 13px; font-weight: 500; overflow: hidden;
+                text-overflow: ellipsis; white-space: nowrap; }
+  .proj-title a { color: var(--fg); text-decoration: none; }
+  .proj-title a:hover { color: var(--brand); }
+  .proj-status-badge {
+    font-size: 10px; padding: 2px 8px; border-radius: 999px; font-weight: 600;
+    text-align: center;
+  }
+  .proj-status-badge.active   { background: oklch(94% 0.06 240); color: oklch(35% 0.18 240); }
+  .proj-status-badge.planning { background: var(--brand-soft); color: var(--brand); }
+  .proj-status-badge.review   { background: oklch(96% 0.07 80); color: oklch(40% 0.16 80); }
+  .proj-status-badge.done     { background: oklch(94% 0.06 145); color: oklch(35% 0.16 145); }
+  .proj-status-badge.paused   { background: var(--surface-2); color: var(--muted); }
+
+  /* Mini progress bar in project row */
+  .proj-bar-wrap { height: 6px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+  .proj-bar-fill { height: 100%; border-radius: 999px;
+                   background: linear-gradient(90deg, var(--brand), var(--accent));
+                   transition: width 600ms var(--ease); }
+  .proj-pct { font-size: 11px; font-family: 'JetBrains Mono', monospace;
+              color: var(--brand); font-weight: 700; text-align: right; }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="page">
+  {% set active_nav = 'dashboard' %}
+  {% include "partials/topbar.html" %}
+
+  <div class="content">
+    <!-- KPI row -->
+    <div class="kpi-row" style="margin-bottom: 28px;">
+      <div class="kpi-card highlight">
+        <div class="kpi-label">오늘 완료</div>
+        <div class="kpi-value">{{ today_done }}</div>
+        <div class="kpi-sub">/ {{ today_total }}개 처리됨</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">완료율 (오늘)</div>
+        <div class="kpi-value">{% if today_total %}{{ ((today_done / today_total) * 100) | round | int }}%{% else %}—{% endif %}</div>
+        <div class="kpi-sub">{{ today_done }} done / {{ today_total }} total</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">🔥 연속 달성</div>
+        <div class="kpi-value">{{ streak }}</div>
+        <div class="kpi-sub">일 연속 완료</div>
+      </div>
+      <div class="kpi-card {% if overdue_count > 0 %}warn{% endif %}">
+        <div class="kpi-label">기한 초과</div>
+        <div class="kpi-value">{{ overdue_count }}</div>
+        <div class="kpi-sub">{% if overdue_count > 0 %}<a href="/search?status_filter=todo&date_to={{ today }}" style="color:inherit;">확인하기 →</a>{% else %}없음{% endif %}</div>
+      </div>
+    </div>
+
+    <!-- Weekly chart -->
+    <div class="week-chart">
+      <div class="sec-title">최근 7일 활동</div>
+      {% set max_total = week_data | map(attribute='total') | max %}
+      <div class="week-bars">
+        {% for d in week_data %}
+        {% set bar_h = ((d.total / max_total) * 90) | int if max_total else 4 %}
+        {% set done_h = ((d.done / max_total) * 90) | int if max_total else 0 %}
+        <div class="week-bar-col">
+          {% if d.done > 0 %}<div class="week-bar-pct">{{ d.pct }}%</div>{% else %}<div class="week-bar-pct" style="opacity:0">0%</div>{% endif %}
+          <div class="week-bar-wrap">
+            <div class="week-bar" style="height: {{ bar_h }}px;">
+              <div class="bar-todo" style="height: {{ bar_h }}px;"></div>
+              <div class="bar-done" style="height: {{ done_h }}px;"></div>
+            </div>
+          </div>
+          <div class="week-bar-label">{{ d.day }}</div>
+          <div class="week-bar-date">{{ d.date }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Projects progress -->
+    {% if projects %}
+    <div class="sec-title">프로젝트 현황</div>
+    <div class="proj-grid">
+      <div class="proj-row proj-row-head">
+        <div>프로젝트</div>
+        <div>상태</div>
+        <div>진행률</div>
+        <div>%</div>
+      </div>
+      {% for p in projects %}
+      <div class="proj-row">
+        <div class="proj-title">
+          <a href="/project/{{ p.id }}">{{ p.title }}</a>
+        </div>
+        <div>
+          <span class="proj-status-badge {{ p.status }}">
+            {{ {'active':'진행중','planning':'기획','review':'검토','done':'완료','paused':'중단'}.get(p.status, p.status) }}
+          </span>
+        </div>
+        <div>
+          <div class="proj-bar-wrap">
+            <div class="proj-bar-fill" style="width: {{ p.pct }}%"></div>
+          </div>
+        </div>
+        <div class="proj-pct">{{ p.pct }}%</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+/* Make today's column stand out */
+document.querySelectorAll('.week-bar-col').forEach((col, i) => {
+  if (i === 6) col.style.opacity = '1'; else col.style.opacity = '0.65';
+});
+</script>
+{% endblock %}

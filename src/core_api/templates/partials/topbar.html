@@ -1,0 +1,25 @@
+{# Shared topbar — set active_nav before including: {% set active_nav = 'flow' %} #}
+<div class="topbar">
+  <a href="/" class="logo">MC</a>
+  <nav class="nav">
+    <a href="/" {% if active_nav == 'flow' %}class="active"{% endif %}>Flow</a>
+    <a href="/calendar" {% if active_nav == 'calendar' %}class="active"{% endif %}>Calendar</a>
+    <a href="/hierarchy" {% if active_nav == 'hierarchy' %}class="active"{% endif %}>Hierarchy</a>
+    <a href="/wbs" {% if active_nav == 'wbs' %}class="active"{% endif %}>WBS</a>
+    <a href="/inbox" {% if active_nav == 'inbox' %}class="active"{% endif %}>수신함<span
+       class="nav-badge inbox-nav-badge" style="display:none"></span></a>
+    <a href="/orphans" {% if active_nav == 'orphans' %}class="active"{% endif %}>미연결<span
+       class="nav-badge orphans-nav-badge" style="display:none"></span></a>
+    <a href="/search" {% if active_nav == 'search' %}class="active"{% endif %}>검색</a>
+    <a href="/contacts" {% if active_nav == 'contacts' %}class="active"{% endif %}>연락처</a>
+    <a href="/dashboard" {% if active_nav == 'dashboard' %}class="active"{% endif %}>대시보드</a>
+    <a href="/diag" {% if active_nav == 'diag' %}class="active"{% endif %}>진단</a>
+  </nav>
+  <div class="spacer"></div>
+  <a href="/morning" style="font-size:12px; color:var(--muted); text-decoration:none; padding:4px 10px;
+     border:1px solid var(--border); border-radius:6px; white-space:nowrap;">☀ 아침</a>
+  <a href="/evening" style="font-size:12px; color:var(--muted); text-decoration:none; padding:4px 10px;
+     border:1px solid var(--border); border-radius:6px; white-space:nowrap; margin-left:4px;">🌙 저녁</a>
+  <a href="/settings" style="font-size:18px; color:var(--muted); text-decoration:none;
+     padding:4px 8px; margin-left:4px;">⚙</a>
+</div>

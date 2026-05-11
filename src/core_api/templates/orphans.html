@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+{% block title %}미연결 항목 · MC{% endblock %}
+
+{% block head %}
+<style>
+  .page { display: grid; grid-template-rows: 56px 1fr; height: 100vh; }
+
+  /* Two-column layout: card list + context panel */
+  .orph-wrap {
+    display: grid;
+    grid-template-columns: minmax(320px, 1fr) 400px;
+    overflow: hidden;
+  }
+
+  /* ── Left: card list ─────────────────────────────── */
+  .orph-list-area { padding: 28px 32px; overflow-y: auto; }
+
+  .page-h-row { display: flex; align-items: baseline; gap: 14px; margin-bottom: 6px; }
+  .page-h     { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
+  .page-meta  { font-size: 13px; color: var(--muted); }
+  .page-sub   { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
+
+  /* Bulk action bar */
+  .bulk-bar {
+    position: sticky; top: 0; z-index: 5;
+    display: flex; gap: 8px; align-items: center; padding: 10px 14px;
+    background: var(--brand-soft); border: 1px solid var(--brand);
+    border-radius: 10px; margin-bottom: 14px;
+    transform: translateY(-8px); opacity: 0; pointer-events: none;
+    transition: all 200ms var(--ease);
+  }
+  .bulk-bar.active { transform: translateY(0); opacity: 1; pointer-events: auto; }
+  .bulk-count { font-size: 13px; font-weight: 600; color: var(--brand); }
+  .bulk-bar select, .bulk-bar button {
+    padding: 6px 12px; font-size: 12px; border-radius: 6px;
+    border: 1px solid var(--brand); background: var(--bg); color: var(--fg);
+    font-family: inherit; cursor: pointer;
+  }
+  .bulk-bar button { background: var(--brand); color: white; border: none; font-weight: 500; }
+  .bulk-bar button:hover { opacity: 0.9; }
+  .bulk-bar .clear-btn { background: transparent; color: var(--brand); }
+
+  /* Item cards */
+  .orph-card {
+    display: flex; gap: 0; align-items: stretch;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; margin-bottom: 8px;
+    transition: border-color 120ms, box-shadow 120ms;
+    overflow: hidden; position: relative;
+  }
+  .orph-card:hover { border-color: var(--muted); }
+  .orph-card.open  { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand); }
+  .orph-card.selected { background: var(--brand-soft); }
+  .orph-card.selected .orph-sel { background: var(--brand); }
+  .orph-card.selected .orph-cb  { color: white; }
+
+  /* Selection zone (left strip) */
+  .orph-sel {
+    width: 36px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; border-right: 1px solid var(--border);
+    transition: background 120ms; color: var(--muted); font-size: 13px;
+  }
+  .orph-sel:hover { background: var(--surface-2); }
+
+  /* Type icon */
+  .orph-icon {
+    width: 36px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; color: var(--muted);
+  }
+
+  /* Clickable body → opens context panel */
+  .orph-body {
+    flex: 1; min-width: 0; padding: 12px 10px 12px 4px;
+    cursor: pointer;
+  }
+  .orph-body:hover .orph-title { color: var(--brand); }
+  .orph-title { font-size: 14px; font-weight: 500; margin-bottom: 4px;
+                transition: color 120ms; }
+  .orph-meta {
+    font-size: 11px; color: var(--muted); display: flex;
+    gap: 8px; flex-wrap: wrap; align-items: center;
+  }
+  .orph-tags { display: flex; gap: 4px; }
+
+  /* Actions (right) */
+  .orph-actions {
+    display: flex; align-items: center; padding: 0 10px;
+    gap: 4px; flex-shrink: 0;
+  }
+  .orph-action-btn {
+    padding: 4px 8px; font-size: 11px; border-radius: 6px;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--muted); cursor: pointer; transition: all 80ms;
+  }
+  .orph-action-btn:hover { border-color: oklch(65% 0.2 20); color: oklch(45% 0.2 20); }
+
+  /* Keyboard hint */
+  .kbd-hint {
+    font-size: 11px; color: var(--muted); margin-bottom: 14px;
+    display: flex; gap: 14px; flex-wrap: wrap;
+  }
+  .kbd { font-family: 'JetBrains Mono', monospace; font-size: 10px;
+         padding: 1px 6px; background: var(--surface-2);
+         border: 1px solid var(--border); border-radius: 4px; }
+
+  /* Empty state */
+  .orph-empty { text-align: center; padding: 80px 20px; }
+  .orph-empty-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
+  .orph-empty-text { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+  .orph-empty-sub  { font-size: 13px; color: var(--muted); }
+
+  /* ── Right: context panel ────────────────────────── */
+  .orph-panel-area {
+    border-left: 1px solid var(--border);
+    overflow-y: auto;
+    position: relative;
+  }
+  #orph-ctx-panel {
+    height: 100%;
+  }
+  .orph-panel-placeholder {
+    display: flex; align-items: center; justify-content: center;
+    text-align: center; color: var(--muted); font-size: 13px;
+    line-height: 1.7; height: 100%; padding: 40px 24px;
+  }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="page">
+  {% set active_nav = 'orphans' %}
+  {% include "partials/topbar.html" %}
+
+  <div class="orph-wrap">
+    <!-- ── Left: cards ── -->
+    <div class="orph-list-area">
+      <div class="page-h-row">
+        <div class="page-h">미연결 항목</div>
+        <span class="page-meta">{{ count }}개 · 프로젝트 미배정</span>
+      </div>
+      <div class="page-sub">
+        Quick Capture 후 아직 어디에 속할지 정하지 못한 항목들.
+        카드를 클릭해서 편집하거나, 체크 후 일괄 연결하세요.
+      </div>
+
+      <div class="kbd-hint">
+        <span><span class="kbd">click</span> 패널 열기</span>
+        <span><span class="kbd">☐ 클릭</span> 선택 토글</span>
+        <span><span class="kbd">a</span> 전체 선택</span>
+        <span><span class="kbd">Esc</span> 선택 해제</span>
+      </div>
+
+      <!-- Bulk action bar -->
+      <div class="bulk-bar" id="bulk-bar">
+        <span class="bulk-count" id="bulk-count">0개 선택</span>
+        <select id="bulk-project">
+          <option value="">— 프로젝트 선택 —</option>
+          {% for p in projects %}
+          <option value="{{ p.id }}">
+            {% if p.org_name %}{{ p.org_name }} / {% endif %}{% if p.biz_name %}{{ p.biz_name }} / {% endif %}{{ p.title }}
+          </option>
+          {% endfor %}
+        </select>
+        <button onclick="bulkAssign()">→ 연결</button>
+        <div style="flex:1;"></div>
+        <button class="clear-btn" onclick="clearSel()">취소</button>
+      </div>
+
+      {% if items %}
+      <div id="orph-list">
+        {% for item in items %}
+        <div class="orph-card" id="orph-card-{{ item.id }}" data-id="{{ item.id }}">
+
+          <!-- Selection zone -->
+          <div class="orph-sel" title="선택" onclick="toggleSel({{ item.id }})">
+            <span class="orph-cb" id="orph-cb-{{ item.id }}">○</span>
+          </div>
+
+          <!-- Type icon -->
+          <div class="orph-icon">
+            {%- if item.type == 'memo' -%}📝
+            {%- elif item.type == 'schedule' -%}★
+            {%- else -%}☐
+            {%- endif -%}
+          </div>
+
+          <!-- Body — click opens context panel -->
+          <div class="orph-body"
+               hx-get="/partial/context/{{ item.id }}"
+               hx-target="#orph-ctx-panel"
+               hx-swap="innerHTML"
+               onclick="activateCard({{ item.id }})">
+            <div class="orph-title">{{ item.title }}</div>
+            <div class="orph-meta">
+              <span>{{ item.created_at[:10] }}</span>
+              <span>·</span>
+              <span>{{ item.status }}</span>
+              {% if item.tags %}
+              <span class="orph-tags">
+                {% for tag in item.tags %}
+                <span class="tag-chip">#{{ tag }}</span>
+                {% endfor %}
+              </span>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div class="orph-actions">
+            <button class="orph-action-btn"
+                    hx-delete="/api/items/{{ item.id }}"
+                    hx-confirm="삭제?"
+                    hx-target="closest .orph-card"
+                    hx-swap="outerHTML swap:300ms">✕</button>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="orph-empty">
+        <div class="orph-empty-icon">✦</div>
+        <div class="orph-empty-text">미연결 항목이 없습니다</div>
+        <div class="orph-empty-sub">모든 항목이 프로젝트에 연결되어 있습니다</div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- ── Right: context panel ── -->
+    <div class="orph-panel-area">
+      <div id="orph-ctx-panel">
+        <div class="orph-panel-placeholder">
+          항목을 클릭하면<br>상세 정보 및 편집 패널이 열립니다
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const selected = new Set();
+
+function toggleSel(id) {
+  if (selected.has(id)) {
+    selected.delete(id);
+  } else {
+    selected.add(id);
+  }
+  const card = document.getElementById('orph-card-' + id);
+  const cb   = document.getElementById('orph-cb-' + id);
+  if (card) card.classList.toggle('selected', selected.has(id));
+  if (cb)   cb.textContent = selected.has(id) ? '●' : '○';
+  const bar = document.getElementById('bulk-bar');
+  document.getElementById('bulk-count').textContent = selected.size + '개 선택';
+  bar.classList.toggle('active', selected.size > 0);
+}
+
+function clearSel() {
+  selected.forEach(id => {
+    const card = document.getElementById('orph-card-' + id);
+    const cb   = document.getElementById('orph-cb-' + id);
+    if (card) card.classList.remove('selected');
+    if (cb)   cb.textContent = '○';
+  });
+  selected.clear();
+  document.getElementById('bulk-bar').classList.remove('active');
+}
+
+function activateCard(id) {
+  document.querySelectorAll('.orph-card.open').forEach(c => c.classList.remove('open'));
+  const card = document.getElementById('orph-card-' + id);
+  if (card) card.classList.add('open');
+}
+
+async function bulkAssign() {
+  const projId = document.getElementById('bulk-project').value;
+  if (!projId) { alert('프로젝트를 선택하세요'); return; }
+  const ids = Array.from(selected);
+  for (const id of ids) {
+    const fd = new FormData();
+    fd.append('project_id', projId);
+    await fetch('/api/items/' + id + '/project', { method: 'POST', body: fd });
+    const card = document.getElementById('orph-card-' + id);
+    if (card) card.remove();
+  }
+  selected.clear();
+  document.getElementById('bulk-bar').classList.remove('active');
+  if (!document.querySelector('.orph-card')) location.reload();
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  if (e.target.matches('input, textarea, select')) return;
+  if (e.key === 'a' && !e.metaKey && !e.ctrlKey) {
+    document.querySelectorAll('.orph-card').forEach(c => {
+      const id = parseInt(c.dataset.id);
+      selected.add(id);
+      c.classList.add('selected');
+      const cb = document.getElementById('orph-cb-' + id);
+      if (cb) cb.textContent = '●';
+    });
+    const n = document.querySelectorAll('.orph-card').length;
+    document.getElementById('bulk-count').textContent = n + '개 선택';
+    document.getElementById('bulk-bar').classList.toggle('active', n > 0);
+    e.preventDefault();
+  }
+  if (e.key === 'Escape') clearSel();
+});
+
+// After project link from context panel, remove card from orphan list
+document.addEventListener('htmx:afterRequest', e => {
+  const url = e.detail?.requestConfig?.path || '';
+  if (/\/api\/items\/\d+\/project/.test(url) && e.detail?.xhr?.status === 200) {
+    const m = url.match(/\/api\/items\/(\d+)\/project/);
+    if (m) {
+      const card = document.getElementById('orph-card-' + m[1]);
+      if (card) card.remove();
+      if (!document.querySelector('.orph-card')) location.reload();
+    }
+  }
+});
+</script>
+{% endblock %}

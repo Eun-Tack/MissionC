@@ -1,0 +1,52 @@
+{#
+  Project items partial — loaded via GET /partial/project/{id}/items
+  Context: items, project_id, today
+#}
+{% set active_items = items | selectattr('status', 'ne', 'done') | list %}
+{% set done_items   = items | selectattr('status', 'equalto', 'done') | list %}
+
+{% if active_items %}
+<div class="items-group-h">진행 중 · 대기 ({{ active_items|length }})</div>
+{% for item in active_items %}
+<div class="item-row" id="item-row-{{ item.id }}" data-status="{{ item.status }}"
+     onclick="openProjCtx({{ item.id }})" style="cursor:pointer;">
+  <button class="item-dot" data-status="{{ item.status }}"
+          onclick="event.stopPropagation(); toggleProjItem(this, {{ item.id }}, {{ project_id }})"
+          title="완료 처리"></button>
+  <span class="item-title">{{ item.title }}</span>
+  {% if item.sub_total and item.sub_total > 0 %}
+  <span class="item-sub-pct" title="하위 {{ item.sub_done }}/{{ item.sub_total }}">
+    <span class="mini-bar"><span class="mini-fill" style="width:{{ item.sub_pct }}%"></span></span>
+    {{ item.sub_pct }}%
+  </span>
+  {% endif %}
+  {% if item.due_date %}
+  <span class="item-due {% if item.due_date < today %}overdue{% endif %}"
+        title="마감: {{ item.due_date }}">📅 {{ item.due_date[5:] }}</span>
+  {% elif item.scheduled_at %}
+  <span class="item-date">{{ item.scheduled_at[:10] }}</span>
+  {% endif %}
+  <span class="item-open-btn">›</span>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if done_items %}
+<div class="items-group-h">완료 ({{ done_items|length }})</div>
+{% for item in done_items %}
+<div class="item-row" id="item-row-{{ item.id }}" data-status="{{ item.status }}"
+     onclick="openProjCtx({{ item.id }})" style="cursor:pointer;">
+  <button class="item-dot" data-status="{{ item.status }}"
+          onclick="event.stopPropagation(); toggleProjItem(this, {{ item.id }}, {{ project_id }})"
+          title="되돌리기"></button>
+  <span class="item-title">{{ item.title }}</span>
+  <span class="item-open-btn">›</span>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if not items %}
+<div style="text-align:center; padding:32px; color:var(--muted); font-size:13px;">
+  연결된 할 일이 없습니다
+</div>
+{% endif %}

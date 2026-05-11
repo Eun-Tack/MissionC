@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Project Hub</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="left-rail glass">
+        <div class="brand">
+          <p class="eyebrow">Local Mission Control</p>
+          <h1>Project Hub</h1>
+          <p class="lede">대표, 연구, 개발을 한 화면에서 묶는 개인 운영 시스템</p>
+        </div>
+
+        <section class="glass mini-panel">
+          <p class="section-label">Today Pulse</p>
+          <div id="summary-grid" class="summary-grid"></div>
+        </section>
+
+        <section class="glass mini-panel">
+          <p class="section-label">Momentum Radar</p>
+          <div id="radar" class="radar"></div>
+        </section>
+
+        <section class="glass mini-panel">
+          <p class="section-label">Accelerator Deck</p>
+          <div id="hardware" class="hardware-stack"></div>
+        </section>
+      </aside>
+
+      <main class="main-stage">
+        <section class="hero glass">
+          <div>
+            <p class="eyebrow">Interface Experiment</p>
+            <h2>계획이 아니라 흐름을 다루는 작업실</h2>
+            <p>
+              프로젝트 카드, 활동 로그, 메모, 계정 링크가 서로 떨어지지 않고 한 맥락 안에서 움직입니다.
+            </p>
+          </div>
+          <div class="hero-orbit">
+            <div class="orb orb-a"></div>
+            <div class="orb orb-b"></div>
+            <div class="orb orb-c"></div>
+          </div>
+        </section>
+
+        <section class="workspace">
+          <div class="projects-column">
+            <div class="section-topline">
+              <div>
+                <p class="eyebrow">Projects</p>
+                <h3>현재 프로젝트</h3>
+              </div>
+            </div>
+            <div id="project-list" class="project-list"></div>
+          </div>
+
+          <div class="detail-column">
+            <section class="glass detail-panel">
+              <div id="project-detail" class="project-detail empty-state">
+                프로젝트를 선택하면 상세 흐름이 여기 표시됩니다.
+              </div>
+            </section>
+
+            <section class="capture-grid">
+              <form id="project-form" class="glass capture-card">
+                <p class="section-label">New Project</p>
+                <input name="name" placeholder="프로젝트 이름" required />
+                <input name="area" placeholder="area: leadership / research / build / ops" />
+                <input name="path" placeholder="연결할 로컬 폴더 경로" />
+                <textarea name="summary" placeholder="무엇을 위한 프로젝트인지"></textarea>
+                <textarea name="vision" placeholder="장기 비전 또는 북극성"></textarea>
+                <div class="inline-fields">
+                  <select name="priority">
+                    <option value="P0">P0</option>
+                    <option value="P1" selected>P1</option>
+                    <option value="P2">P2</option>
+                    <option value="P3">P3</option>
+                  </select>
+                  <input name="energy" type="number" min="0" max="100" value="60" />
+                </div>
+                <button type="submit">프로젝트 만들기</button>
+              </form>
+
+              <form id="entry-form" class="glass capture-card">
+                <p class="section-label">Quick Capture</p>
+                <select name="type">
+                  <option value="task">Task</option>
+                  <option value="log">Log</option>
+                  <option value="note">Note</option>
+                  <option value="link">Link</option>
+                </select>
+                <input name="line1" placeholder="제목 또는 요약" required />
+                <input name="line2" placeholder="부가 정보: due / status / kind / value" />
+                <button type="submit">선택한 프로젝트에 추가</button>
+              </form>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <template id="project-card-template">
+      <button class="project-card glass" type="button">
+        <div class="project-head">
+          <div>
+            <p class="project-name"></p>
+            <p class="project-meta"></p>
+          </div>
+          <span class="project-energy"></span>
+        </div>
+        <p class="project-summary"></p>
+        <div class="project-footer">
+          <span class="project-status"></span>
+          <span class="project-tasks"></span>
+        </div>
+      </button>
+    </template>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

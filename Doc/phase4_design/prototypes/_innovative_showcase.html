@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>MC Innovation Showcase</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css">
+<style>
+  :root {
+    --bg: oklch(15% 0.01 270);   /* 다크 우선 — 별자리/유리 효과 강조 */
+    --fg: oklch(94% 0.005 270);
+    --muted: oklch(65% 0.015 270);
+    --border: oklch(28% 0.015 270);
+    --surface: oklch(20% 0.01 270);
+    --surface-2: oklch(24% 0.012 270);
+    --brand: oklch(70% 0.18 280);
+    --accent: oklch(78% 0.15 200);
+    --gold: oklch(80% 0.13 80);
+    --rose: oklch(70% 0.18 25);
+    --green: oklch(70% 0.16 145);
+    --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { font-family: 'Pretendard Variable', system-ui, sans-serif;
+               background: var(--bg); color: var(--fg);
+               font-feature-settings: 'cv11'; }
+
+  /* === Ambient particle background (full page) === */
+  #ambient { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.5; }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 80px 40px; position: relative; z-index: 1; }
+  .hero {  text-align: center; margin-bottom: 80px; }
+  .hero h1 {
+    font-size: 56px; font-weight: 800; letter-spacing: -0.03em;
+    background: linear-gradient(180deg, var(--fg) 0%, var(--brand) 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    line-height: 1.1;
+  }
+  .hero p { color: var(--muted); margin-top: 16px; font-size: 16px; }
+  .hero .meta { font-family: 'JetBrains Mono', monospace; font-size: 12px;
+                color: var(--brand); margin-top: 24px; letter-spacing: 0.1em; text-transform: uppercase; }
+
+  /* Section */
+  .demo {
+    margin: 80px 0;
+    padding: 48px;
+    background: linear-gradient(180deg, var(--surface) 0%, var(--bg) 100%);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    position: relative; overflow: hidden;
+  }
+  .demo-tag { display: inline-block; padding: 4px 10px; font-size: 10px;
+              font-family: 'JetBrains Mono', monospace; text-transform: uppercase;
+              letter-spacing: 0.1em; background: var(--surface-2);
+              color: var(--brand); border-radius: 999px; margin-bottom: 12px; }
+  .demo h2 { font-size: 32px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 8px; }
+  .demo .subtitle { color: var(--muted); font-size: 14px; margin-bottom: 32px; line-height: 1.6; }
+
+  /* === 1. Voice Glass Overlay === */
+  .glass-stage {
+    position: relative; height: 360px;
+    background-image:
+      radial-gradient(circle at 20% 30%, oklch(45% 0.18 280 / 0.4), transparent 50%),
+      radial-gradient(circle at 80% 70%, oklch(45% 0.15 200 / 0.4), transparent 50%),
+      radial-gradient(circle at 50% 50%, oklch(45% 0.16 145 / 0.2), transparent 60%);
+    border-radius: 16px; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .glass-panel {
+    width: 480px; padding: 32px;
+    background: oklch(94% 0.005 270 / 0.06);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid oklch(94% 0.005 270 / 0.15);
+    border-radius: 24px;
+    box-shadow:
+      0 1px 0 oklch(100% 0 0 / 0.1) inset,
+      0 24px 80px oklch(0% 0 0 / 0.5);
+  }
+  .glass-panel .mic-pulse {
+    width: 64px; height: 64px; border-radius: 50%; margin: 0 auto 20px;
+    background: radial-gradient(circle, var(--brand), transparent 70%);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; position: relative;
+  }
+  .glass-panel .mic-pulse::before, .glass-panel .mic-pulse::after {
+    content: ''; position: absolute; inset: 0; border-radius: 50%;
+    border: 1px solid var(--brand);
+    animation: mic-ring 2.4s ease-out infinite;
+  }
+  .glass-panel .mic-pulse::after { animation-delay: 1.2s; }
+  @keyframes mic-ring {
+    0%   { transform: scale(0.6); opacity: 1; }
+    100% { transform: scale(2.2); opacity: 0; }
+  }
+  .glass-text {
+    text-align: center; font-size: 18px; font-weight: 500;
+    margin: 16px 0; min-height: 28px;
+  }
+  .glass-text .typing { border-right: 2px solid var(--brand); animation: cursor 0.8s step-end infinite; }
+  @keyframes cursor { 50% { border-color: transparent; } }
+
+  /* Audio waveform — animated SVG bars */
+  .wave { display: flex; gap: 3px; justify-content: center; height: 40px; align-items: center; }
+  .wave .bar {
+    width: 3px; background: var(--brand); border-radius: 2px;
+    animation: wave-bar 1.2s ease-in-out infinite;
+  }
+  .wave .bar:nth-child(1) { animation-delay: 0s; }
+  .wave .bar:nth-child(2) { animation-delay: 0.1s; }
+  .wave .bar:nth-child(3) { animation-delay: 0.2s; }
+  .wave .bar:nth-child(4) { animation-delay: 0.3s; }
+  .wave .bar:nth-child(5) { animation-delay: 0.4s; }
+  .wave .bar:nth-child(6) { animation-delay: 0.5s; }
+  .wave .bar:nth-child(7) { animation-delay: 0.4s; }
+  .wave .bar:nth-child(8) { animation-delay: 0.3s; }
+  .wave .bar:nth-child(9) { animation-delay: 0.2s; }
+  .wave .bar:nth-child(10){ animation-delay: 0.1s; }
+  @keyframes wave-bar { 0%,100% { height: 8px; } 50% { height: 32px; } }
+  .glass-actions { display: flex; gap: 8px; justify-content: center; margin-top: 20px; }
+  .glass-btn {
+    padding: 8px 16px; font-size: 13px; border-radius: 999px;
+    background: oklch(94% 0.005 270 / 0.1); border: 1px solid oklch(94% 0.005 270 / 0.15);
+    color: var(--fg); cursor: pointer; backdrop-filter: blur(8px);
+  }
+  .glass-btn.primary { background: var(--brand); border-color: var(--brand); color: white; }
+
+  /* === 2. Time Constellation === */
+  .constellation-stage {
+    position: relative; height: 480px; display: flex;
+    align-items: center; justify-content: center;
+  }
+  #constellation { width: 480px; height: 480px; }
+  .constellation-info {
+    position: absolute; top: 24px; left: 24px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: var(--muted); line-height: 1.8;
+  }
+
+  /* === 3. Memo Lifecycle === */
+  .lifecycle-track {
+    position: relative; padding: 60px 40px 40px;
+    height: 200px;
+  }
+  .lifecycle-line {
+    position: absolute; left: 80px; right: 80px; top: 100px;
+    height: 2px; background: linear-gradient(90deg,
+      transparent, var(--border), var(--border), transparent);
+  }
+  .evo-dot {
+    position: absolute; top: 92px;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--brand); cursor: pointer;
+    box-shadow: 0 0 0 4px oklch(70% 0.18 280 / 0.15);
+    transition: all 240ms var(--ease);
+  }
+  .evo-dot:hover { transform: scale(1.4); box-shadow: 0 0 0 6px oklch(70% 0.18 280 / 0.25); }
+  .evo-dot::after {
+    content: attr(data-time);
+    position: absolute; top: 28px; left: 50%; transform: translateX(-50%);
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    color: var(--muted); white-space: nowrap;
+  }
+  .evo-dot::before {
+    content: attr(data-sha);
+    position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%);
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    color: var(--muted); opacity: 0; transition: opacity 240ms;
+    background: var(--surface); padding: 2px 6px; border-radius: 4px;
+    border: 1px solid var(--border); white-space: nowrap;
+  }
+  .evo-dot:hover::before { opacity: 1; }
+
+  @keyframes evo-pulse {
+    0%, 100% { box-shadow: 0 0 0 4px oklch(70% 0.18 280 / 0.15); }
+    50%      { box-shadow: 0 0 0 10px oklch(70% 0.18 280 / 0); }
+  }
+  .evo-dot.live { animation: evo-pulse 2.4s ease-in-out infinite; }
+
+  .lifecycle-meta {
+    text-align: center; font-size: 13px; color: var(--muted);
+    margin-top: 20px;
+  }
+  .lifecycle-meta strong { color: var(--brand); font-weight: 600; }
+
+  /* === 4. Reflection Constellation === */
+  .reflection-stage {
+    position: relative; height: 360px;
+    background: radial-gradient(ellipse at center, oklch(20% 0.02 280), var(--bg));
+    border-radius: 16px; overflow: hidden;
+  }
+  .star {
+    position: absolute; border-radius: 50%; cursor: pointer;
+    transition: all 240ms var(--ease);
+  }
+  .star:hover { transform: scale(1.6); }
+  .star::after {
+    content: attr(data-cat) ' · ' attr(data-count);
+    position: absolute; left: 100%; top: 50%; transform: translate(8px, -50%);
+    background: var(--surface); border: 1px solid var(--border);
+    padding: 4px 10px; border-radius: 6px;
+    font-size: 11px; white-space: nowrap;
+    opacity: 0; pointer-events: none; transition: opacity 240ms;
+  }
+  .star:hover::after { opacity: 1; }
+  @keyframes twinkle {
+    0%, 100% { opacity: 0.7; }
+    50%      { opacity: 1; }
+  }
+  .star { animation: twinkle 4s ease-in-out infinite; }
+
+  /* Star size by frequency */
+  .star.large  { width: 14px; height: 14px; box-shadow: 0 0 12px currentColor; }
+  .star.medium { width: 10px; height: 10px; box-shadow: 0 0 8px currentColor; }
+  .star.small  { width: 6px; height: 6px;  box-shadow: 0 0 4px currentColor; }
+
+  .reflection-legend {
+    position: absolute; bottom: 16px; left: 16px;
+    font-size: 11px; color: var(--muted);
+    display: flex; gap: 16px; flex-wrap: wrap;
+  }
+
+  /* === 5. Memo→Task Morph === */
+  .morph-stage {
+    display: grid; grid-template-columns: 1fr auto 1fr; gap: 24px; align-items: center;
+  }
+  .morph-card {
+    padding: 24px; background: var(--surface); border: 2px solid var(--border);
+    border-radius: 16px; transition: all 480ms var(--ease);
+  }
+  .morph-card[data-type="memo"] { border-color: oklch(48% 0.06 280); }
+  .morph-card[data-type="task"] { border-color: var(--accent); background: oklch(22% 0.04 200); }
+  .morph-card .type-label {
+    font-size: 11px; font-family: 'JetBrains Mono', monospace;
+    color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em;
+  }
+  .morph-card .title { font-size: 16px; font-weight: 600; margin: 8px 0; }
+  .morph-arrow {
+    font-size: 32px; color: var(--accent);
+    animation: arrow-glow 2s ease-in-out infinite;
+  }
+  @keyframes arrow-glow {
+    0%, 100% { opacity: 0.4; transform: translateX(0); }
+    50%      { opacity: 1;   transform: translateX(4px); }
+  }
+  .morph-trigger {
+    margin-top: 16px; padding: 8px 16px; background: var(--brand); color: white;
+    border: none; border-radius: 8px; cursor: pointer; font-size: 13px;
+  }
+
+  /* Reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Ambient particle background -->
+<canvas id="ambient"></canvas>
+
+<div class="container">
+
+  <div class="hero">
+    <h1>MC Innovation<br>Showcase</h1>
+    <p>도구가 아니라 — 경험.<br>1인 지식노동자를 위한 도전적 UI 실험.</p>
+    <div class="meta">v1.5 · 2026-05-06 · canvas + waapi + backdrop-filter</div>
+  </div>
+
+  <!-- ============================================================
+       1. Voice Glass Overlay (V1.1 SC-05)
+  ============================================================ -->
+  <section class="demo">
+    <span class="demo-tag">V1.1 · FR-UX-04</span>
+    <h2>Voice Glass</h2>
+    <p class="subtitle">
+      음성 캡처가 1등 시민. backdrop-filter blur로 뒤가 부드럽게 흐려지고,
+      Whisper NPU가 변환하는 동안 음파가 살아 움직입니다.
+      <strong style="color: var(--fg);">Calm · Focused · Modern.</strong>
+    </p>
+
+    <div class="glass-stage">
+      <div class="glass-panel">
+        <div class="mic-pulse">🎤</div>
+        <div class="glass-text">
+          "내일 오전 10시 병원 예약<span class="typing"></span>"
+        </div>
+        <div class="wave">
+          <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+          <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+          <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+          <div class="bar"></div>
+        </div>
+        <div style="text-align: center; font-size: 11px; color: var(--muted); margin-top: 12px;">
+          NPU · Whisper Base · confidence 0.92
+        </div>
+        <div class="glass-actions">
+          <button class="glass-btn primary">확인 (Enter)</button>
+          <button class="glass-btn">다시 말하기</button>
+          <button class="glass-btn">텍스트로</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       2. Time Constellation (V1.2 SC-03)
+  ============================================================ -->
+  <section class="demo">
+    <span class="demo-tag">V1.2 · FR-UX-01 · canvas 2d</span>
+    <h2>Time Constellation</h2>
+    <p class="subtitle">
+      24시간을 별자리로. 항목들이 시간 위치에 떠있고, 같은 프로젝트끼리 곡선으로 연결됩니다.
+      iGPU Canvas 렌더링 — 1인 윈도우 노트북에서 60fps 보장.
+    </p>
+
+    <div class="constellation-stage">
+      <div class="constellation-info">
+        2026-05-06 · 오늘<br>
+        7 events · 3 projects<br>
+        ── radial · 24h · midnight at top
+      </div>
+      <canvas id="constellation"></canvas>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       3. Memo Lifecycle Timeline (V1.0)
+  ============================================================ -->
+  <section class="demo">
+    <span class="demo-tag">V1.0 · FR-MEMO-07</span>
+    <h2>Memo Lifecycle</h2>
+    <p class="subtitle">
+      메모는 한 번에 완성되지 않습니다. 5번 진화한 메모는 이렇게 생깁니다 —
+      각 점은 sha256 변경. 마우스를 올려보세요.
+    </p>
+
+    <div class="lifecycle-track">
+      <div class="lifecycle-line"></div>
+      <div class="evo-dot"        style="left: 80px;"  data-time="04-28 09:14" data-sha="sha 8a3f9b · 첫 작성 · 142자"></div>
+      <div class="evo-dot"        style="left: 22%;"   data-time="04-30 14:22" data-sha="sha 2c7d11 · 보강 · +89자"></div>
+      <div class="evo-dot"        style="left: 40%;"   data-time="05-02 11:08" data-sha="sha f4a8e2 · 구조 변경 · ±230자"></div>
+      <div class="evo-dot"        style="left: 60%;"   data-time="05-04 16:55" data-sha="sha 9b1c40 · 결정 추가 · +312자"></div>
+      <div class="evo-dot live"   style="right: 80px;" data-time="05-06 10:42" data-sha="sha 7e2d8a · 최신 · +45자"></div>
+    </div>
+    <div class="lifecycle-meta">
+      📝 <strong>아키텍처 결정 노트</strong> · evolution_count = <strong>5</strong> · 9일에 걸친 진화
+    </div>
+  </section>
+
+  <!-- ============================================================
+       4. Reflection Constellation (V1.1 SC-15)
+  ============================================================ -->
+  <section class="demo">
+    <span class="demo-tag">V1.1 · FR-INSIGHTS-01</span>
+    <h2>Reflection Constellation</h2>
+    <p class="subtitle">
+      "왜 미완료가 반복되는가." 90일 누적 사유를 별자리로 — 가장 큰 별을 보면 자신의 패턴이 보입니다.
+      별 위에 마우스를 올려보세요.
+    </p>
+
+    <div class="reflection-stage" id="reflectionStage">
+      <!-- Stars positioned by category -->
+      <div class="star large"  style="left: 22%; top: 30%; background: var(--gold);"     data-cat="external_block"  data-count="32"></div>
+      <div class="star medium" style="left: 45%; top: 22%; background: var(--rose);"     data-cat="time_short"      data-count="18"></div>
+      <div class="star medium" style="left: 70%; top: 35%; background: var(--accent);"   data-cat="priority_shift"  data-count="14"></div>
+      <div class="star small"  style="left: 30%; top: 60%; background: var(--green);"    data-cat="motivation_low"  data-count="6"></div>
+      <div class="star small"  style="left: 55%; top: 70%; background: var(--brand);"    data-cat="info_lack"       data-count="5"></div>
+      <div class="star small"  style="left: 78%; top: 65%; background: var(--gold);"     data-cat="overestimated"   data-count="8"></div>
+      <div class="star small"  style="left: 88%; top: 50%; background: var(--muted);"    data-cat="other"           data-count="3"></div>
+
+      <!-- Connecting lines (subtle, suggesting relationship) -->
+      <svg style="position: absolute; inset: 0; pointer-events: none; opacity: 0.15;" viewBox="0 0 100 100" preserveAspectRatio="none">
+        <line x1="22" y1="30" x2="45" y2="22" stroke="white" stroke-width="0.1"/>
+        <line x1="45" y1="22" x2="70" y2="35" stroke="white" stroke-width="0.1"/>
+        <line x1="22" y1="30" x2="30" y2="60" stroke="white" stroke-width="0.05"/>
+      </svg>
+
+      <div class="reflection-legend">
+        <span>크기 = 빈도</span>
+        <span>색 = 카테고리 그룹</span>
+        <span>최근 90일</span>
+      </div>
+    </div>
+
+    <div style="margin-top: 16px; padding: 16px; background: var(--surface-2); border-radius: 12px; font-size: 13px; line-height: 1.6;">
+      <strong style="color: var(--gold);">💡 자동 인사이트</strong> —
+      "<strong>external_block</strong>이 다른 모든 카테고리 합보다 큽니다. 기다림 시간을 줄일 수 있는
+      structural change 검토 필요. 평균 미완료 사유 빈도가 지난 30일 대비 <strong>-12%</strong>."
+    </div>
+  </section>
+
+  <!-- ============================================================
+       5. Memo → Task Morph (V1.0)
+  ============================================================ -->
+  <section class="demo">
+    <span class="demo-tag">V1.0 · FR-MEMO-07</span>
+    <h2>Memo → Task Morph</h2>
+    <p class="subtitle">
+      메모로 시작했다가 점점 구체화되어 task가 됩니다. 체크박스 추가 = 자연스러운 승격.
+      클릭으로 변환 시연 →
+    </p>
+
+    <div class="morph-stage">
+      <div class="morph-card" data-type="memo" id="morphCard">
+        <div class="type-label">📝 memo · 자유 사고</div>
+        <div class="title">새 NPU 모델 후보 검토</div>
+        <div style="font-size: 13px; color: var(--muted); margin-top: 8px; line-height: 1.5;">
+          KoE5 vs bge-m3 — 한국어 회상률·용량·NPU 호환성 비교 필요.
+          이번 주에 결정해야 다음 단계로 넘어감...
+        </div>
+        <button class="morph-trigger" id="morphBtn">+ 체크박스 추가</button>
+      </div>
+
+      <div class="morph-arrow">→</div>
+
+      <div class="morph-card" data-type="task" id="morphResult" style="opacity: 0.4;">
+        <div class="type-label">☐ task · 실행 가능</div>
+        <div class="title">NPU 모델 회상률 비교 (KoE5 vs bge-m3)</div>
+        <div style="font-size: 13px; color: var(--muted); margin-top: 8px; line-height: 1.5;">
+          ☐ 50개 한국어 메모로 둘 다 임베딩 → 회상률 측정<br>
+          ☐ 차원 비교 (384 vs 1024)<br>
+          ☐ NPU 추론 시간 측정
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       Footer
+  ============================================================ -->
+  <div style="text-align: center; padding: 60px 0 0; color: var(--muted); font-size: 12px;">
+    이 시안은 V1.0~V1.2의 대표적 혁신 요소를 한데 모은 것입니다.<br>
+    실제 V1.0에서는 Voice Glass·Constellation·Reflection이 미니멀 형태로 시작.
+  </div>
+
+</div>
+
+<script>
+  // ============================================
+  // Ambient particle field
+  // ============================================
+  (function() {
+    const canvas = document.getElementById('ambient');
+    const ctx = canvas.getContext('2d');
+    let w, h, particles = [];
+    function resize() {
+      w = canvas.width = innerWidth;
+      h = canvas.height = innerHeight;
+    }
+    resize();
+    addEventListener('resize', resize);
+    for (let i = 0; i < 60; i++) {
+      particles.push({
+        x: Math.random() * w, y: Math.random() * h,
+        vx: (Math.random() - 0.5) * 0.15,
+        vy: (Math.random() - 0.5) * 0.15,
+        r: Math.random() * 1.5 + 0.4,
+        a: Math.random() * 0.5 + 0.2
+      });
+    }
+    function loop() {
+      ctx.clearRect(0, 0, w, h);
+      particles.forEach(p => {
+        p.x += p.vx; p.y += p.vy;
+        if (p.x < 0 || p.x > w) p.vx *= -1;
+        if (p.y < 0 || p.y > h) p.vy *= -1;
+        ctx.fillStyle = `oklch(70% 0.18 280 / ${p.a})`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      requestAnimationFrame(loop);
+    }
+    loop();
+  })();
+
+  // ============================================
+  // Time Constellation (Canvas 2D)
+  // ============================================
+  (function() {
+    const canvas = document.getElementById('constellation');
+    const ctx = canvas.getContext('2d');
+    canvas.width = 480; canvas.height = 480;
+    const cx = 240, cy = 240, R = 180;
+
+    // Sample events: { hour, minute, project, label }
+    const events = [
+      { time: 9.0,  proj: 'gcal',  label: '스탠드업', size: 4 },
+      { time: 10.0, proj: 'bohun', label: '투자자',  size: 6 },
+      { time: 11.0, proj: 'mc',    label: 'PR #42',   size: 4 },
+      { time: 14.0, proj: 'mc',    label: '메모',     size: 3 },
+      { time: 15.5, proj: 'mc',    label: '설계',    size: 5 },
+      { time: 17.0, proj: 'gcal',  label: '1on1',     size: 4 },
+      { time: 19.0, proj: 'bohun', label: '회고',    size: 3 },
+    ];
+    const colors = {
+      mc:    'oklch(70% 0.18 280)',
+      bohun: 'oklch(72% 0.16 30)',
+      gcal:  'oklch(72% 0.20 250)'
+    };
+
+    function draw(t) {
+      ctx.clearRect(0, 0, 480, 480);
+
+      // Outer ring (24h reference)
+      ctx.strokeStyle = 'oklch(28% 0.015 270)';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+
+      // Hour ticks
+      for (let h = 0; h < 24; h++) {
+        const a = (h / 24) * Math.PI * 2 - Math.PI / 2;
+        const r1 = R, r2 = R + (h % 6 === 0 ? 8 : 4);
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
+        ctx.lineTo(cx + Math.cos(a) * r2, cy + Math.sin(a) * r2);
+        ctx.strokeStyle = h % 6 === 0 ? 'oklch(50% 0.02 270)' : 'oklch(28% 0.015 270)';
+        ctx.stroke();
+        if (h % 6 === 0) {
+          ctx.fillStyle = 'oklch(55% 0.015 270)';
+          ctx.font = '10px JetBrains Mono';
+          ctx.textAlign = 'center';
+          ctx.fillText(String(h).padStart(2,'0'), cx + Math.cos(a) * (r2 + 14), cy + Math.sin(a) * (r2 + 14) + 3);
+        }
+      }
+
+      // Now indicator (current time slow rotation pulse)
+      const nowH = 14 + (t / 60000) % 1;
+      const na = (nowH / 24) * Math.PI * 2 - Math.PI / 2;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(na) * R, cy + Math.sin(na) * R);
+      ctx.strokeStyle = 'oklch(78% 0.15 200 / 0.4)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Connect events of the same project (curves)
+      const projGroups = {};
+      events.forEach(e => { (projGroups[e.proj] ||= []).push(e); });
+      Object.entries(projGroups).forEach(([proj, evs]) => {
+        if (evs.length < 2) return;
+        ctx.strokeStyle = colors[proj] + '';
+        ctx.globalAlpha = 0.15;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        evs.forEach((e, i) => {
+          const a = (e.time / 24) * Math.PI * 2 - Math.PI / 2;
+          const x = cx + Math.cos(a) * R, y = cy + Math.sin(a) * R;
+          if (i === 0) ctx.moveTo(x, y);
+          else {
+            // Quadratic to center for graceful arc
+            const prev = evs[i-1];
+            const pa = (prev.time / 24) * Math.PI * 2 - Math.PI / 2;
+            const px = cx + Math.cos(pa) * R, py = cy + Math.sin(pa) * R;
+            const mx = (px + x) / 2, my = (py + y) / 2;
+            const ctrlx = cx + (mx - cx) * 0.3, ctrly = cy + (my - cy) * 0.3;
+            ctx.quadraticCurveTo(ctrlx, ctrly, x, y);
+          }
+        });
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      });
+
+      // Event stars
+      events.forEach(e => {
+        const a = (e.time / 24) * Math.PI * 2 - Math.PI / 2;
+        const x = cx + Math.cos(a) * R, y = cy + Math.sin(a) * R;
+        const pulse = 1 + 0.1 * Math.sin(t / 600 + e.time);
+        // Glow
+        const grd = ctx.createRadialGradient(x, y, 0, x, y, e.size * 4);
+        grd.addColorStop(0, colors[e.proj]);
+        grd.addColorStop(1, 'transparent');
+        ctx.fillStyle = grd;
+        ctx.globalAlpha = 0.4;
+        ctx.beginPath();
+        ctx.arc(x, y, e.size * 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        // Core
+        ctx.fillStyle = colors[e.proj];
+        ctx.beginPath();
+        ctx.arc(x, y, e.size * pulse, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // Center label (today)
+      ctx.fillStyle = 'oklch(94% 0.005 270)';
+      ctx.font = '600 14px Pretendard Variable';
+      ctx.textAlign = 'center';
+      ctx.fillText('05.06', cx, cy - 2);
+      ctx.font = '11px Pretendard Variable';
+      ctx.fillStyle = 'oklch(65% 0.015 270)';
+      ctx.fillText('Wed · 7 events', cx, cy + 14);
+
+      requestAnimationFrame(draw);
+    }
+    requestAnimationFrame(draw);
+  })();
+
+  // ============================================
+  // Memo → Task Morph
+  // ============================================
+  document.getElementById('morphBtn').addEventListener('click', () => {
+    const card = document.getElementById('morphCard');
+    const result = document.getElementById('morphResult');
+    card.animate([
+      { transform: 'scale(1)', borderColor: 'oklch(48% 0.06 280)' },
+      { transform: 'scale(1.04)', borderColor: 'oklch(70% 0.18 280)' },
+      { transform: 'scale(1)', borderColor: 'var(--accent)' }
+    ], { duration: 480, easing: 'cubic-bezier(0.32, 0.72, 0, 1)', fill: 'forwards' });
+    result.animate([
+      { opacity: 0.4, transform: 'translateX(-12px)' },
+      { opacity: 1,   transform: 'translateX(0)' }
+    ], { duration: 480, easing: 'cubic-bezier(0.32, 0.72, 0, 1)', fill: 'forwards' });
+  });
+</script>
+
+</body>
+</html>
