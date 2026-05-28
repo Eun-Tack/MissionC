@@ -4,7 +4,7 @@ MissionC is not just a task manager, dashboard, or project viewer. It is a
 personal operating system for closing work.
 
 Its purpose is to help the user move projects from intention to completion,
-while keeping work, meaning, reflection, and evidence connected.
+then preserve the result so it can inform the next useful project.
 
 ## Core Belief
 
@@ -24,6 +24,9 @@ visible, but not finished.
 MissionC exists to turn those fragments into a coherent personal mission
 control system that helps the user close the loop.
 
+A closed project should not disappear. It should become evidence, learning,
+asset, and momentum for future work.
+
 ## Craft Principles
 
 | Principle | Meaning | Product Implication |
@@ -34,6 +37,7 @@ control system that helps the user close the loop.
 | Local trust | The user should feel ownership over their data and operating environment. | Prefer local storage, local diagnostics, explicit credentials, and visible sync state. |
 | Honest automation | Automation should reduce work without pretending to be more reliable than it is. | Sync, cache, credentials, and AI actions must expose status and failure. |
 | Flexible craft | Product concepts can evolve through use, but pivots must be traceable. | Use Semantic-Dev-Graph decisions for pivots and meaning changes. |
+| Outcomes become inputs | The result of a closed project should feed future projects. | Preserve outcomes, evidence, reusable assets, lessons, and typed project links. |
 | Small surface, deep utility | A few well-connected workflows are better than many detached features. | Prioritize closing loop, daily flow, calendar, organization graph, capture, WBS, and review before novelty. |
 
 ## Closing Thesis
@@ -56,6 +60,8 @@ The product should repeatedly ask:
 - What is the next closing action?
 - Is the project blocked, drifting, or genuinely progressing?
 - What did today's work teach?
+- What did the closed project produce?
+- Which open project can reuse or learn from it?
 
 ## Concept Model
 
@@ -70,6 +76,8 @@ MissionC should use a small set of concepts consistently.
 | Capture | A low-friction input before classification. | Quick capture, Telegram, and future voice input should land here safely. |
 | Review | The place where unfinished work becomes learning and tomorrow's closing action. | Morning/evening review should feed future planning and quality factors. |
 | WBS | A closing map that shows project structure, sequence, time, and unfinished work. | WBS is not just visualization; it should expose the path to completion. |
+| Outcome | The result left by a closed project. | Deliverable, capability, decision, learning, relationship, operational improvement, financial signal. |
+| Project Link | A typed relation between a closed result and another project. | enables, reuses, depends_on, informs, supersedes, blocks, contributes_to. |
 | Semantic Decision | A traceable statement connecting product meaning to implementation evidence. | Used for pivots, quality-factor changes, and major workflow choices. |
 | Lab Feature | A visible but explicitly experimental capability. | Radial command palette belongs here until interaction safety is proven. |
 
@@ -81,10 +89,30 @@ MissionC should be organized around a daily loop:
 2. Work execution: capture, schedule, connect, and update items in context.
 3. WBS/project check: compare actual work against project structure and closing path.
 4. Evening review: mark what closed, explain what did not, decide carry-over, defer, cancel, or learn.
-5. Evidence update: preserve decisions, blockers, and patterns for future cycles.
+5. Outcome capture: preserve what the closed work produced, proved, or taught.
+6. Evidence update: connect outcomes, blockers, and patterns to future cycles.
 
 Morning and evening feedback are therefore core product mechanisms, not
 secondary review screens.
+
+## Outcome Continuity
+
+Closing is not the end of a project. Closing is the moment when work becomes
+usable history.
+
+Closed projects should be able to produce:
+
+- outcome,
+- evidence,
+- reusable asset,
+- lesson,
+- impact signal,
+- link to another open project.
+
+This is the layer that can later connect to accounting or performance systems,
+but MissionC should not become accounting software prematurely. Financial
+signals should remain optional impact records until a real accounting workflow
+exists.
 
 ## Naming Decision
 

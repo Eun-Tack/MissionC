@@ -1,9 +1,10 @@
 # MissionC
 
 MissionC is a local-first mission control system for a single knowledge worker.
-It is designed to help projects close, not merely be viewed. It connects
-schedule, tasks, notes, projects, WBS, reviews, integrations, and operational
-diagnostics into one reliable workspace.
+It is designed to help projects close, not merely be viewed. Closed work should
+leave outcomes, evidence, reusable assets, and lessons that can inform other
+open projects. MissionC connects schedule, tasks, notes, projects, WBS, reviews,
+integrations, and operational diagnostics into one reliable workspace.
 
 The project was formerly developed under the short name `MC`. The internal
 environment prefix may still use `MC_*` for compatibility, but the product,
@@ -102,6 +103,7 @@ MissionC/
 - [Doc/MASTER_SPEC.md](Doc/MASTER_SPEC.md)
 - [Doc/PRODUCT_PHILOSOPHY.md](Doc/PRODUCT_PHILOSOPHY.md)
 - [Doc/CLOSING_GRAPH_REVIEW.md](Doc/CLOSING_GRAPH_REVIEW.md)
+- [Doc/OUTCOME_GRAPH.md](Doc/OUTCOME_GRAPH.md)
 - [Doc/IMPLEMENTATION_LEDGER.md](Doc/IMPLEMENTATION_LEDGER.md)
 - [Doc/REPO_BOUNDARIES.md](Doc/REPO_BOUNDARIES.md)
 - [Doc/CLAUDE.md](Doc/CLAUDE.md)

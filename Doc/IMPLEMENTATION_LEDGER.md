@@ -41,6 +41,7 @@ truth table:
 | AI suggestion | FR-RND-03, F-5 | `items`, `tags`, `projects` | `src/core_api/routers/ai_suggest.py` | test gap | Lightweight heuristic |
 | Radial command palette | SDG-DEC-003, FR-LAB-01, F-7 | command state in browser, future lab toggle setting | `radial.js`, `radial.css`, `radial_palette.html` | GitHub issue #1 | Lab feature planned |
 | Background sync | SDG-DEC-006, FR-SYNC-01, F-4 | `settings`, `gcal_cache`, `github_cache`, future sync state/cursor | `src/core_api/main.py`, `src/core_api/integrations.py`, diagnostics/settings UI | design pending | Planned |
+| Outcome graph | SDG-DEC-008, FR-OUTCOME-01, FP-10, F-9 | future `project_outcomes`, `outcome_evidence`, `outcome_impacts`, `project_links` | future project close flow, project detail, WBS overlays | `Doc/OUTCOME_GRAPH.md` | Planned |
 
 ## Data Connection Map
 
@@ -54,6 +55,7 @@ truth table:
 | Operations | `notification_events`, `retry_queue`, `settings` | `diagnostics.py`, `notifications.py`, `setup.py` | alerts, retry visibility, setup, health |
 | Review | `incomplete_reasons`, `review_memos` | `review.py` | morning/evening review |
 | Closing loop | `items.status`, `items.due_date`, `incomplete_reasons`, `review_memos`, `project_stages`, `item_projects` | `review.py`, `wbs.py`, `items.py`, `flow.py` | daily closing, carry-over, blockers, WBS completion path |
+| Outcome graph | future `project_outcomes`, `outcome_evidence`, `outcome_impacts`, `project_links` | future close summary, WBS, project detail | closed project results, reusable assets, lessons, cross-project links |
 | Files | `file_index`, local notes folders | `hierarchy.py`, `integrations.py` | folder open, project folder creation |
 
 ## Evidence Coverage
@@ -78,6 +80,7 @@ truth table:
 | HOLE-006 | Tests | Current tests cover core flows but not several newer routers. | Deferred: first refine philosophy and concept model before choosing test priority. |
 | HOLE-007 | RnD AI | AI search/voice/tagging are partially represented but not product-grade. | Should these remain explicitly RnD, or should one be promoted into the next product cycle? |
 | HOLE-008 | Closing model | Morning/evening review and WBS exist, but they are not yet unified as a project closing system. | Define first-class closing outcomes and connect review results to WBS/project progress. |
+| HOLE-009 | Outcome continuity | Closed projects do not yet leave reusable outcome nodes or typed links to open projects. | Start with a lightweight close summary before adding tables or accounting integration. |
 
 ## Maintenance Rule
 

@@ -96,7 +96,8 @@ flowchart LR
 
 Current gap: `review.py` records incomplete reasons, and `wbs.py` displays
 project/task timelines, but there is no strong feedback edge from review
-outcomes into WBS/project closure.
+outcomes into WBS/project closure. There is also no outcome graph that lets a
+closed project feed another open project.
 
 ## 3. Closing State Graph
 
@@ -196,6 +197,22 @@ flowchart LR
     Project --> Morning
 ```
 
+The next layer is:
+
+```mermaid
+flowchart LR
+    Project["Closed Project"]
+    Outcome["Outcome"]
+    Evidence["Evidence"]
+    Link["Typed Project Link"]
+    Open["Open Project"]
+
+    Project --> Outcome
+    Outcome --> Evidence
+    Outcome --> Link
+    Link --> Open
+```
+
 Suggested first implementation slice:
 
 1. Define first-class closing outcomes in docs and UI copy.
@@ -203,6 +220,7 @@ Suggested first implementation slice:
 3. Add a project-level "next closing action" concept.
 4. Let evening review write decisions that can be surfaced in project/WBS views.
 5. Rename or reframe passive labels/screens so they point toward closure.
+6. Add an outcome graph later so closed projects can inform open projects.
 
 ## 8. Questions For Owner
 
@@ -211,3 +229,4 @@ Suggested first implementation slice:
 3. Should WBS show review outcomes directly, or only show blockers/next actions first?
 4. Is `Dashboard` still valuable if it becomes a "Closure Dashboard" rather than a general dashboard?
 5. Should `Contacts` represent people as blockers/owners/attendees, or stay as simple address book context?
+6. Should a closed project's outcome become a first-class node immediately, or should it start as a project close summary?

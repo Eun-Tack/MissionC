@@ -40,6 +40,8 @@ The expanded philosophy and concept definitions live in
 The current closing-loop graph review and cleanup candidates live in
 `Doc/CLOSING_GRAPH_REVIEW.md`.
 
+The outcome and cross-project result graph lives in `Doc/OUTCOME_GRAPH.md`.
+
 ### 0.2 First Principles
 
 | FP-ID | Principle | Statement | Source |
@@ -53,6 +55,7 @@ The current closing-loop graph review and cleanup candidates live in
 | FP-7 | Lab before default | Experimental interactions may exist, but they must be explicitly marked as lab features until safe. | Owner decision |
 | FP-8 | Background without opacity | Background sync is desirable only when cache state, failures, and manual recovery are visible. | Owner decision |
 | FP-9 | Closure over visibility | MissionC should help projects reach Done, Deferred, Cancelled, or Learned states, not simply display project data. | Owner decision |
+| FP-10 | Outcomes become inputs | A closed project should leave outcomes, evidence, assets, and lessons that can inform or enable open projects. | Owner decision |
 
 ### 0.3 Quality Factors
 
@@ -66,6 +69,7 @@ The current closing-loop graph review and cleanup candidates live in
 | F-6 | Semantic Coherence | Product meaning, requirements, implementation, and Git evidence should remain connected. | semantic decision coverage |
 | F-7 | Interaction Safety | Experimental UI must not trap the user or block core workflows. | stuck overlay incidents, escape-path coverage |
 | F-8 | Closure Momentum | The system should make open work, blockers, next closing actions, and review outcomes visible. | stale open work, carry-over count, unresolved blocker age, review completion |
+| F-9 | Outcome Traceability | Closed work should preserve what was produced, why it mattered, and which future projects it affects. | outcome coverage, evidence coverage, linked follow-up count |
 
 ## 1. Project Overview
 
@@ -99,6 +103,7 @@ Repository ownership boundaries are tracked in `Doc/REPO_BOUNDARIES.md`.
 | In | Background sync model for GCal/GitHub with visible state. | Planned |
 | In | Morning/evening review as the daily closing loop. | Built, needs product strengthening |
 | In | WBS as the project closing map, not only a timeline view. | Built, needs product strengthening |
+| In | Outcome graph for closed project results and cross-project reuse. | Planned |
 | In | Semantic-Dev-Graph documentation and decision tracing. | Started |
 | Out | Multi-user SaaS, mobile app, remote-first AI processing. | Future |
 
@@ -117,6 +122,7 @@ Repository ownership boundaries are tracked in `Doc/REPO_BOUNDARIES.md`.
 | FR-SYNC-01 | Background sync | Run Google Calendar and GitHub sync in the background with cache-first UI, visible last-sync state, and manual fallback. | Should | Planned |
 | FR-CLOSE-01 | Daily closing loop | Use morning preview and evening review to convert open work into Done, Deferred, Cancelled, or Learned outcomes. | Must | Built, needs strengthening |
 | FR-WBS-01 | WBS closing map | Show project structure, sequence, time, blockers, and unfinished work so the user can close projects deliberately. | Must | Built, needs strengthening |
+| FR-OUTCOME-01 | Project outcome graph | Capture closed project outcomes, evidence, impact signals, reusable assets, lessons, and links to open projects. | Should | Planned |
 | FR-RND-01 | Local semantic search experiment | Validate local embeddings/search before productizing. | Should | Draft |
 | FR-RND-02 | Local voice capture experiment | Validate local STT accuracy and latency. | Should | Draft |
 | FR-RND-03 | AI tag suggestion experiment | Validate whether local AI reduces manual classification cost. | Could | Draft |
@@ -134,6 +140,8 @@ Repository ownership boundaries are tracked in `Doc/REPO_BOUNDARIES.md`.
 | BR-SYNC-01 | Background sync fails | Preserve cached data, show last failure state, and keep manual refresh available. | FR-SYNC-01 |
 | BR-CLOSE-01 | A project or item remains open after review | The system should ask whether it is Done, Deferred, Cancelled, blocked, or carried forward with a next closing action. | FR-CLOSE-01 |
 | BR-WBS-01 | A project is shown in WBS | Show not only structure and dates, but the path to closure: incomplete work, blockers, sequence risk, and next action. | FR-WBS-01 |
+| BR-OUTCOME-01 | A project closes as Done, Cancelled, Deferred, or Learned | Capture the smallest useful outcome record: result, evidence, lesson or asset, and optional linked open project. | FR-OUTCOME-01 |
+| BR-OUTCOME-02 | A closed project result affects another project | Create a typed project link such as enables, reuses, depends_on, informs, supersedes, blocks, or contributes_to. | FR-OUTCOME-01 |
 
 ## 4. Semantic-Dev-Graph Seed
 
@@ -150,6 +158,7 @@ matter first.
 | SDG-DEC-005 | Decision | "Sosok" means Organization; new product copy should use Organization/조직 instead of 소속. | FP-6, F-6 | `Doc/PRODUCT_PHILOSOPHY.md` | Active |
 | SDG-DEC-006 | Decision | MissionC should move toward automatic background sync with visible cache/failure/manual-refresh state. | FP-8, F-4 | owner decision | Active |
 | SDG-DEC-007 | Decision | MissionC is a project closing system, not a project viewing dashboard. Morning/evening review and WBS are core closing mechanisms. | FP-9, F-8 | owner decision | Active |
+| SDG-DEC-008 | Decision | Closed projects should produce outcome nodes that can connect to open projects, reusable assets, lessons, impact signals, and future accounting edges. | FP-10, F-9 | `Doc/OUTCOME_GRAPH.md` | Active |
 
 ## 5. Operations Catalog
 
@@ -178,6 +187,7 @@ matter first.
 | FR-SYNC-01 | scheduler lifecycle, integrations, diagnostics, settings copy | Manual |
 | FR-CLOSE-01 | review router, morning/evening templates, incomplete reasons, carry-over flow | Manual |
 | FR-WBS-01 | WBS router/template, project stages, item links, blocker/review data | Manual |
+| FR-OUTCOME-01 | future outcome records, project links, project detail, WBS overlays | Manual |
 | FR-RND-* | RnD experiment reports | Manual |
 | BR-SDG-01 | semantic decision templates and PR review checklist | Manual |
 
@@ -190,6 +200,7 @@ matter first.
 | 2026-05-28 | CHG-MISSIONC-001 | Class B | Reframed MC as MissionC and aligned docs to AI_SDLC v2.1.1. |
 | 2026-05-28 | CHG-PHIL-001 | Class B | Added MissionC product philosophy, organization terminology, lab feature direction, and background sync direction. |
 | 2026-05-28 | CHG-CLOSE-001 | Class B | Reframed MissionC around project closing, morning/evening reflection, and WBS as a closing map. |
+| 2026-05-28 | CHG-OUTCOME-001 | Class B | Added outcome graph model for closed project results, reusable assets, lessons, impact, and cross-project links. |
 
 ## 8. Open Questions
 
@@ -202,3 +213,6 @@ matter first.
 | OQ-SDG-01 | Which semantic decisions deserve first-class issue templates versus simple markdown rows? | Medium | Open |
 | OQ-CLOSE-01 | What closing outcomes should be first-class in the UI: Done, Deferred, Cancelled, Learned, Blocked, or Carry-over? | High | Open |
 | OQ-CLOSE-02 | Should WBS include blocker/review overlays in V1, or first strengthen schedule/task sequence only? | High | Open |
+| OQ-OUTCOME-01 | Should outcomes be captured only at project close, or also at milestone/stage completion? | High | Open |
+| OQ-OUTCOME-02 | Which impact vocabulary should be first: time saved, cost avoided, quality improved, revenue enabled, risk reduced, or trust increased? | Medium | Open |
+| OQ-OUTCOME-03 | Should project-to-project links be manual first, or suggested later by search/AI? | Medium | Open |
