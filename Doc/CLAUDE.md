@@ -26,7 +26,8 @@ cost. User-facing product language should prefer MissionC.
 ## Product Philosophy
 
 MissionC is a local-first mission control system for one knowledge worker.
-It should keep schedules, projects, notes, decisions, and integration signals
+It should help the user close projects, not merely view them. Schedules,
+projects, notes, decisions, WBS, reviews, and integration signals should stay
 inside one reliable operating context.
 
 The central principle is:
@@ -56,6 +57,8 @@ For expanded product philosophy and terminology, read
   affiliation concept. Treat older `소속` wording as historical evidence.
 - Background sync is a desired direction, but it must expose cache, last-sync,
   failure, and manual-refresh state.
+- Treat morning preview, evening review, and WBS as core closing mechanisms.
+  Changes to these areas should preserve the closing loop.
 - Treat `MC` as a compatibility shorthand and `MissionC` as the product name.
 
 ## AI_SDLC Phase Paths
@@ -132,6 +135,7 @@ Minimum fields:
 | Google Calendar auth | OAuth and local credential handling must remain consistent and diagnosable. |
 | Organization/project linkage | Schedules and items should carry organization, business, and project context. |
 | Background sync | GCal/GitHub should move toward background refresh with honest visible state. |
+| Closing loop | Morning/evening review and WBS should help projects reach explicit outcomes, not just display status. |
 | Telegram offset | Must be persisted before Telegram polling becomes active. |
 | AI RnD | Local AI features need measurable experiments before product workflows. |
 

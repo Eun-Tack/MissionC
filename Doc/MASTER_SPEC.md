@@ -23,8 +23,9 @@ identity is MissionC.
 ### 0.1 Philosophy
 
 MissionC is a local-first mission control system for a single knowledge worker.
-It exists to keep schedules, notes, projects, decisions, and integration
-signals connected to the meaning behind the work.
+It exists to help the user close work, not merely view it. Schedules, notes,
+projects, decisions, WBS structure, reviews, and integration signals should
+connect around one question: what will help this work reach a clear outcome?
 
 The guiding belief is simple: a system should not contain meaningless
 structure. Every visible feature, hidden rule, document, and automation path
@@ -48,6 +49,7 @@ The expanded philosophy and concept definitions live in
 | FP-6 | Meaningful structure | Product concepts, data models, and UI surfaces should carry intentional meaning, not decorative labels. | Owner interview |
 | FP-7 | Lab before default | Experimental interactions may exist, but they must be explicitly marked as lab features until safe. | Owner decision |
 | FP-8 | Background without opacity | Background sync is desirable only when cache state, failures, and manual recovery are visible. | Owner decision |
+| FP-9 | Closure over visibility | MissionC should help projects reach Done, Deferred, Cancelled, or Learned states, not simply display project data. | Owner decision |
 
 ### 0.3 Quality Factors
 
@@ -60,6 +62,7 @@ The expanded philosophy and concept definitions live in
 | F-5 | RnD Measurability | AI features need datasets, pass criteria, failure criteria, and rollback paths. | experiment pass rate, rollback rate |
 | F-6 | Semantic Coherence | Product meaning, requirements, implementation, and Git evidence should remain connected. | semantic decision coverage |
 | F-7 | Interaction Safety | Experimental UI must not trap the user or block core workflows. | stuck overlay incidents, escape-path coverage |
+| F-8 | Closure Momentum | The system should make open work, blockers, next closing actions, and review outcomes visible. | stale open work, carry-over count, unresolved blocker age, review completion |
 
 ## 1. Project Overview
 
@@ -91,6 +94,8 @@ Repository ownership boundaries are tracked in `Doc/REPO_BOUNDARIES.md`.
 | In | Telegram capture. | Built, needs offset persistence before active use |
 | In | Lab feature toggle model for experimental interactions. | Planned |
 | In | Background sync model for GCal/GitHub with visible state. | Planned |
+| In | Morning/evening review as the daily closing loop. | Built, needs product strengthening |
+| In | WBS as the project closing map, not only a timeline view. | Built, needs product strengthening |
 | In | Semantic-Dev-Graph documentation and decision tracing. | Started |
 | Out | Multi-user SaaS, mobile app, remote-first AI processing. | Future |
 
@@ -107,6 +112,8 @@ Repository ownership boundaries are tracked in `Doc/REPO_BOUNDARIES.md`.
 | FR-OPS-01 | Diagnostics and retry visibility | Surface DB, cache, worker, credential, and sync state. | Must | Built |
 | FR-LAB-01 | Lab feature toggles | Keep experimental interactions available without making them default workflow dependencies. | Should | Planned |
 | FR-SYNC-01 | Background sync | Run Google Calendar and GitHub sync in the background with cache-first UI, visible last-sync state, and manual fallback. | Should | Planned |
+| FR-CLOSE-01 | Daily closing loop | Use morning preview and evening review to convert open work into Done, Deferred, Cancelled, or Learned outcomes. | Must | Built, needs strengthening |
+| FR-WBS-01 | WBS closing map | Show project structure, sequence, time, blockers, and unfinished work so the user can close projects deliberately. | Must | Built, needs strengthening |
 | FR-RND-01 | Local semantic search experiment | Validate local embeddings/search before productizing. | Should | Draft |
 | FR-RND-02 | Local voice capture experiment | Validate local STT accuracy and latency. | Should | Draft |
 | FR-RND-03 | AI tag suggestion experiment | Validate whether local AI reduces manual classification cost. | Could | Draft |
@@ -122,6 +129,8 @@ Repository ownership boundaries are tracked in `Doc/REPO_BOUNDARIES.md`.
 | BR-SDG-01 | A feature changes product meaning or quality factors | Add or update a Semantic-Dev-Graph decision entry. | FR-OPS-01 |
 | BR-LAB-01 | A feature is experimental or interaction-unsafe | Keep it behind a lab toggle until escape paths and core actions are verified. | FR-LAB-01 |
 | BR-SYNC-01 | Background sync fails | Preserve cached data, show last failure state, and keep manual refresh available. | FR-SYNC-01 |
+| BR-CLOSE-01 | A project or item remains open after review | The system should ask whether it is Done, Deferred, Cancelled, blocked, or carried forward with a next closing action. | FR-CLOSE-01 |
+| BR-WBS-01 | A project is shown in WBS | Show not only structure and dates, but the path to closure: incomplete work, blockers, sequence risk, and next action. | FR-WBS-01 |
 
 ## 4. Semantic-Dev-Graph Seed
 
@@ -137,6 +146,7 @@ matter first.
 | SDG-DEC-004 | Decision | AI features stay in RnD until measurable local experiments pass. | FP-5, F-5 | RnD docs and tests | Active |
 | SDG-DEC-005 | Decision | "Sosok" means Organization; new product copy should use Organization/조직 instead of 소속. | FP-6, F-6 | `Doc/PRODUCT_PHILOSOPHY.md` | Active |
 | SDG-DEC-006 | Decision | MissionC should move toward automatic background sync with visible cache/failure/manual-refresh state. | FP-8, F-4 | owner decision | Active |
+| SDG-DEC-007 | Decision | MissionC is a project closing system, not a project viewing dashboard. Morning/evening review and WBS are core closing mechanisms. | FP-9, F-8 | owner decision | Active |
 
 ## 5. Operations Catalog
 
@@ -163,6 +173,8 @@ matter first.
 | FR-ORG-01 | item/calendar forms and project/business selectors | Manual |
 | FR-LAB-01 | settings UI, radial palette include, feature flags | Manual |
 | FR-SYNC-01 | scheduler lifecycle, integrations, diagnostics, settings copy | Manual |
+| FR-CLOSE-01 | review router, morning/evening templates, incomplete reasons, carry-over flow | Manual |
+| FR-WBS-01 | WBS router/template, project stages, item links, blocker/review data | Manual |
 | FR-RND-* | RnD experiment reports | Manual |
 | BR-SDG-01 | semantic decision templates and PR review checklist | Manual |
 
@@ -174,6 +186,7 @@ matter first.
 | 2026-05-27 | CHG-RND-001 | Class B | Added local AI/search/voice/tag/sync hardening RnD track. |
 | 2026-05-28 | CHG-MISSIONC-001 | Class B | Reframed MC as MissionC and aligned docs to AI_SDLC v2.1.1. |
 | 2026-05-28 | CHG-PHIL-001 | Class B | Added MissionC product philosophy, organization terminology, lab feature direction, and background sync direction. |
+| 2026-05-28 | CHG-CLOSE-001 | Class B | Reframed MissionC around project closing, morning/evening reflection, and WBS as a closing map. |
 
 ## 8. Open Questions
 
@@ -184,3 +197,5 @@ matter first.
 | OQ-RND-03 | How should Google/GitHub background sync be scheduled and surfaced without blocking pages? | Medium | Decided direction, design open |
 | OQ-RND-04 | What exact persistence key/table should Telegram polling offset use? | High before Telegram launch | Open |
 | OQ-SDG-01 | Which semantic decisions deserve first-class issue templates versus simple markdown rows? | Medium | Open |
+| OQ-CLOSE-01 | What closing outcomes should be first-class in the UI: Done, Deferred, Cancelled, Learned, Blocked, or Carry-over? | High | Open |
+| OQ-CLOSE-02 | Should WBS include blocker/review overlays in V1, or first strengthen schedule/task sequence only? | High | Open |

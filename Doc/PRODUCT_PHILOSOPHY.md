@@ -1,7 +1,10 @@
 # MissionC Product Philosophy
 
-MissionC is not just a task manager. It is a personal operating system for
-keeping work, meaning, and evidence connected.
+MissionC is not just a task manager, dashboard, or project viewer. It is a
+personal operating system for closing work.
+
+Its purpose is to help the user move projects from intention to completion,
+while keeping work, meaning, reflection, and evidence connected.
 
 ## Core Belief
 
@@ -13,12 +16,13 @@ context, make better decisions, or maintain trust in the system.
 
 ## Product Thesis
 
-Modern knowledge work breaks because context is scattered. A schedule lives in
-one place, a memo in another, a project in another, and the reason behind a
-decision disappears into chat, Git, or memory.
+Modern knowledge work breaks because context is scattered and closure is weak.
+A schedule lives in one place, a memo in another, a project in another, and the
+reason behind a decision disappears into chat, Git, or memory. Work remains
+visible, but not finished.
 
 MissionC exists to turn those fragments into a coherent personal mission
-control system.
+control system that helps the user close the loop.
 
 ## Craft Principles
 
@@ -26,10 +30,32 @@ control system.
 |-----------|---------|---------------------|
 | Meaning before feature | A feature is valid only when it serves a clear concept. | Do not add screens or commands just because they are possible. |
 | Context continuity | Work items should remember why they exist and where they belong. | Calendar, items, notes, projects, Git evidence, and reviews should connect. |
+| Closure over visibility | Seeing a project is not enough; MissionC should help the user finish, defer, cancel, or learn from it. | Project views must show completion pressure, blockers, next actions, and review prompts. |
 | Local trust | The user should feel ownership over their data and operating environment. | Prefer local storage, local diagnostics, explicit credentials, and visible sync state. |
 | Honest automation | Automation should reduce work without pretending to be more reliable than it is. | Sync, cache, credentials, and AI actions must expose status and failure. |
 | Flexible craft | Product concepts can evolve through use, but pivots must be traceable. | Use Semantic-Dev-Graph decisions for pivots and meaning changes. |
-| Small surface, deep utility | A few well-connected workflows are better than many detached features. | Prioritize daily flow, calendar, organization graph, capture, and review before novelty. |
+| Small surface, deep utility | A few well-connected workflows are better than many detached features. | Prioritize closing loop, daily flow, calendar, organization graph, capture, WBS, and review before novelty. |
+
+## Closing Thesis
+
+MissionC should not merely show projects. It should help close them.
+
+Closing means one of four explicit outcomes:
+
+| Closing Outcome | Meaning |
+|-----------------|---------|
+| Done | The work reached its intended outcome. |
+| Deferred | The work is still meaningful, but not for the current cycle. |
+| Cancelled | The work no longer deserves attention. |
+| Learned | The work exposed a pattern, mistake, blocker, or insight that should change future behavior. |
+
+The product should repeatedly ask:
+
+- What is open?
+- Why is it still open?
+- What is the next closing action?
+- Is the project blocked, drifting, or genuinely progressing?
+- What did today's work teach?
 
 ## Concept Model
 
@@ -42,9 +68,23 @@ MissionC should use a small set of concepts consistently.
 | Project | A concrete outcome-oriented unit of work. | A project may belong to a business or remain unassigned until clarified. |
 | Item | A schedule, task, memo, or project reference. | Items are the atomic work surface. |
 | Capture | A low-friction input before classification. | Quick capture, Telegram, and future voice input should land here safely. |
-| Review | The place where unfinished work becomes learning. | Morning/evening review should feed future planning and quality factors. |
+| Review | The place where unfinished work becomes learning and tomorrow's closing action. | Morning/evening review should feed future planning and quality factors. |
+| WBS | A closing map that shows project structure, sequence, time, and unfinished work. | WBS is not just visualization; it should expose the path to completion. |
 | Semantic Decision | A traceable statement connecting product meaning to implementation evidence. | Used for pivots, quality-factor changes, and major workflow choices. |
 | Lab Feature | A visible but explicitly experimental capability. | Radial command palette belongs here until interaction safety is proven. |
+
+## Daily Closing Loop
+
+MissionC should be organized around a daily loop:
+
+1. Morning preview: decide what can realistically move toward closure today.
+2. Work execution: capture, schedule, connect, and update items in context.
+3. WBS/project check: compare actual work against project structure and closing path.
+4. Evening review: mark what closed, explain what did not, decide carry-over, defer, cancel, or learn.
+5. Evidence update: preserve decisions, blockers, and patterns for future cycles.
+
+Morning and evening feedback are therefore core product mechanisms, not
+secondary review screens.
 
 ## Naming Decision
 

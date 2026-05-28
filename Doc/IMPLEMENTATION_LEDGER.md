@@ -25,9 +25,10 @@ truth table:
 | Items CRUD | FR-CORE-01, F-1 | `items`, `item_tags`, `item_labels`, `item_projects` | `src/core_api/routers/items.py`, `context_panel.html` | item API tests, DB CRUD tests | Built |
 | Recurring item completion | FR-CORE-01, F-1 | `items.recurrence_rule`, `items.recurrence_parent_id`, `items.source` | `src/core_api/routers/items.py`, `migrate.py` | recurrence regression test | Built |
 | Daily flow | FR-CORE-01, F-2 | `items`, `labels`, `item_labels`, `item_projects` | `src/core_api/routers/flow.py`, `index.html`, `flow_list.html` | page smoke tests | Built |
+| Morning/evening closing review | FR-CLOSE-01, FP-9, F-8 | `items`, `incomplete_reasons`, `review_memos` | `src/core_api/routers/review.py`, `morning.html`, `evening.html` | page smoke tests, review route exists | Built, needs closing semantics |
 | Calendar | FR-CAL-01, FR-CAL-02 | `items`, `gcal_cache`, `projects`, `businesses`, `organizations` | `src/core_api/routers/calendar.py`, `calendar.html` | calendar page smoke, org/project form smoke | Built, needs UX review |
 | Organization/business/project hierarchy | FR-ORG-01, FP-3 | `organizations`, `businesses`, `projects`, `project_stages` | `src/core_api/routers/hierarchy.py`, `hierarchy.html`, `project.html` | hierarchy page smoke, FK tests | Built, needs copy/data polish |
-| WBS view | FR-ORG-01, F-2 | `projects`, `project_stages`, `items`, `item_projects` | `src/core_api/routers/wbs.py`, `wbs.html` | page smoke missing | Built, needs tests |
+| WBS closing map | FR-WBS-01, FR-ORG-01, FP-9, F-8 | `projects`, `project_stages`, `items`, `item_projects`, future blocker/review overlays | `src/core_api/routers/wbs.py`, `wbs.html` | page smoke missing | Built, needs closing semantics and tests |
 | Capture inbox | FR-CAP-01, F-1 | `capture_inbox`, `items` | `src/core_api/routers/inbox.py`, `inbox.html` | inbox API tests | Built |
 | Search and command search API | FR-RND-01, F-2 | `items_fts`, `items`, `projects` | `src/core_api/routers/search.py`, `search.html`, local HTMX shim | search tests | Built as FTS, semantic RnD not built |
 | Contacts and attendees | FP-3, F-2 | `contacts`, `item_contacts` | `src/core_api/routers/contacts.py`, `contacts.html`, `attendees.html` | API test gap | Built, needs tests |
@@ -52,6 +53,7 @@ truth table:
 | Integrations | `github_cache`, `gcal_cache`, keyring secrets | `integrations.py`, `auth.py`, `setup.py` | GitHub, Google Calendar, diagnostics |
 | Operations | `notification_events`, `retry_queue`, `settings` | `diagnostics.py`, `notifications.py`, `setup.py` | alerts, retry visibility, setup, health |
 | Review | `incomplete_reasons`, `review_memos` | `review.py` | morning/evening review |
+| Closing loop | `items.status`, `items.due_date`, `incomplete_reasons`, `review_memos`, `project_stages`, `item_projects` | `review.py`, `wbs.py`, `items.py`, `flow.py` | daily closing, carry-over, blockers, WBS completion path |
 | Files | `file_index`, local notes folders | `hierarchy.py`, `integrations.py` | folder open, project folder creation |
 
 ## Evidence Coverage
@@ -75,6 +77,7 @@ truth table:
 | HOLE-005 | Telegram offset | `_tg_offset` is in memory, so restart can duplicate messages. | Should we persist it in `settings`, or create a dedicated integration cursor table? |
 | HOLE-006 | Tests | Current tests cover core flows but not several newer routers. | Deferred: first refine philosophy and concept model before choosing test priority. |
 | HOLE-007 | RnD AI | AI search/voice/tagging are partially represented but not product-grade. | Should these remain explicitly RnD, or should one be promoted into the next product cycle? |
+| HOLE-008 | Closing model | Morning/evening review and WBS exist, but they are not yet unified as a project closing system. | Define first-class closing outcomes and connect review results to WBS/project progress. |
 
 ## Maintenance Rule
 

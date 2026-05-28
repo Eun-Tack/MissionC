@@ -1,7 +1,8 @@
 # MissionC
 
 MissionC is a local-first mission control system for a single knowledge worker.
-It connects schedule, tasks, notes, projects, integrations, and operational
+It is designed to help projects close, not merely be viewed. It connects
+schedule, tasks, notes, projects, WBS, reviews, integrations, and operational
 diagnostics into one reliable workspace.
 
 The project was formerly developed under the short name `MC`. The internal
@@ -17,6 +18,7 @@ serve a clear intention.
 This project treats software as a flexible craft:
 
 - Mission and implementation must stay connected.
+- Projects should move toward explicit closing outcomes.
 - Local trust is more important than feature spectacle.
 - Automation should be honest about its state and failure modes.
 - Product concepts may evolve through actual use, but every pivot should leave
