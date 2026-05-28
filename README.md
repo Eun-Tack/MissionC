@@ -95,6 +95,8 @@ MissionC/
 ## Core Documents
 
 - [Doc/MASTER_SPEC.md](Doc/MASTER_SPEC.md)
+- [Doc/IMPLEMENTATION_LEDGER.md](Doc/IMPLEMENTATION_LEDGER.md)
+- [Doc/REPO_BOUNDARIES.md](Doc/REPO_BOUNDARIES.md)
 - [Doc/CLAUDE.md](Doc/CLAUDE.md)
 - [Doc/phase6_review/Review_Summary.md](Doc/phase6_review/Review_Summary.md)
 - [Doc/phase7_release/Postmortem.md](Doc/phase7_release/Postmortem.md)

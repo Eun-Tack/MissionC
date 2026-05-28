@@ -61,6 +61,9 @@ MissionC is a FastAPI, SQLite, Jinja, and HTMX-based local application. It
 manages daily work through items, projects, calendar views, hierarchy views,
 capture inboxes, and integration setup.
 
+Current implementation details are tracked in `Doc/IMPLEMENTATION_LEDGER.md`.
+Repository ownership boundaries are tracked in `Doc/REPO_BOUNDARIES.md`.
+
 ### 1.1 Current State
 
 | Area | Current State | Evidence |
