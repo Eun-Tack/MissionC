@@ -67,6 +67,8 @@ def _load_processed(db: sqlite3.Connection, limit: int = 20) -> list[dict]:
 
 @router.get("/inbox", response_class=HTMLResponse)
 async def inbox_page(request: Request, db: sqlite3.Connection = Depends(get_db)):
+    from ..integrations import poll_telegram
+    await poll_telegram()
     pending  = _load_inbox(db)
     processed = _load_processed(db, limit=10)
     return templates.TemplateResponse(

@@ -292,22 +292,24 @@
         <span class="svc-icon">🗓</span>
         <div class="svc-info">
           <div class="svc-name">Google Calendar</div>
-          <div class="svc-desc">일정 동기화 — OAuth 2.0</div>
+          <div class="svc-desc">일정 동기화 — 캘린더 화면에서 필요 시 갱신</div>
         </div>
-        <span class="svc-badge {% if gcal_set %}set{% else %}notset{% endif %}">
+        <span class="svc-badge {% if gcal_set %}set{% else %}notset{% endif %}" id="gcal-badge">
           {% if gcal_set %}연결됨{% else %}미설정{% endif %}
         </span>
       </div>
-      <div style="padding: 0 18px 14px; font-size:12px; color:var(--muted);">
-        Google Cloud Console에서 OAuth 2.0 클라이언트 생성 후 credentials.json 경로를 입력하세요.
-        <div style="margin-top:8px;">
-          <input class="field-input field-mono" type="text" id="gcal-creds"
-                 placeholder="C:\Users\...\credentials.json" autocomplete="off">
-          <div style="margin-top:6px; display:flex; gap:6px;">
-            <button type="button" class="btn-save" onclick="saveGcalCreds()">저장</button>
-            <span id="cred-gcal-result" style="font-size:11px; align-self:center;"></span>
-          </div>
-        </div>
+      <div style="padding: 0 18px 14px; display:flex; align-items:center; gap:10px;">
+        <a href="/auth/gcal/connect" class="btn-save" style="text-decoration:none; font-size:12px;">
+          {% if gcal_set %}연결됨{% else %}Google 계정 연결{% endif %}
+        </a>
+        <a href="/auth/gcal/connect?force=1" class="btn-small" style="text-decoration:none; font-size:12px;">
+          {% if gcal_set %}🔄 재연결{% else %}🔗 Google 계정 연결{% endif %}
+        </a>
+        {% if gcal_set %}
+        <button type="button" class="btn-small"
+                hx-get="/settings/test/gcal" hx-target="#gcal-test-result">테스트</button>
+        <span id="gcal-test-result" style="font-size:11px;"></span>
+        {% endif %}
       </div>
 
     </div>

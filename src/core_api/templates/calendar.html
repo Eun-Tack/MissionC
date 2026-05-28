@@ -285,18 +285,28 @@
       </select>
     </div>
 
-    <!-- Project -->
+    <!-- Organization / Business / Project -->
+    <div class="ne-field">
+      <label class="ne-label" for="ne-org">소속</label>
+      <select class="ne-select" id="ne-org" onchange="neOnOrgChange()">
+        <option value="">— 연결 없음</option>
+        {% for org in organizations %}
+        <option value="{{ org.id }}">{{ org.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="ne-field">
+      <label class="ne-label" for="ne-business">사업</label>
+      <select class="ne-select" id="ne-business" onchange="neOnBusinessChange()">
+        <option value="">— 먼저 소속 선택</option>
+      </select>
+    </div>
+
     <div class="ne-field">
       <label class="ne-label" for="ne-project">프로젝트</label>
       <select class="ne-select" id="ne-project">
-        <option value="">— 없음</option>
-        {% for p in projects %}
-        <option value="{{ p.id }}">
-          {%- if p.org_name %}{{ p.org_name }} / {% endif -%}
-          {%- if p.biz_name %}{{ p.biz_name }} / {% endif -%}
-          {{ p.title }}
-        </option>
-        {% endfor %}
+        <option value="">— 먼저 사업 선택</option>
       </select>
     </div>
 
@@ -324,6 +334,45 @@
 <script>
   let _neCurrentMode = '{{ mode }}';
   let _neCurrentAnchor = '{{ anchor }}';
+  const NE_BUSINESSES = {{ businesses | tojson }};
+  const NE_PROJECTS = {{ projects | tojson }};
+
+  function neOption(value, label) {
+    const opt = document.createElement('option');
+    opt.value = value == null ? '' : String(value);
+    opt.textContent = label;
+    return opt;
+  }
+
+  function neSetOptions(selectId, rows, emptyLabel, labelFn) {
+    const select = document.getElementById(selectId);
+    select.innerHTML = '';
+    select.appendChild(neOption('', emptyLabel));
+    rows.forEach(row => select.appendChild(neOption(row.id, labelFn(row))));
+  }
+
+  function neRefreshBusinesses() {
+    const orgId = document.getElementById('ne-org').value;
+    const rows = orgId ? NE_BUSINESSES.filter(b => String(b.org_id || '') === orgId) : [];
+    neSetOptions('ne-business', rows, orgId ? '— 사업 선택' : '— 먼저 소속 선택', b => b.name);
+    neRefreshProjects();
+  }
+
+  function neRefreshProjects() {
+    const bizId = document.getElementById('ne-business').value;
+    const rows = bizId ? NE_PROJECTS.filter(p => String(p.business_id || '') === bizId) : [];
+    neSetOptions('ne-project', rows, bizId ? '— 프로젝트 선택' : '— 먼저 사업 선택', p => p.title);
+  }
+
+  function neOnOrgChange() {
+    neRefreshBusinesses();
+    document.getElementById('ne-error').textContent = '';
+  }
+
+  function neOnBusinessChange() {
+    neRefreshProjects();
+    document.getElementById('ne-error').textContent = '';
+  }
 
   function neSetType(type, btn) {
     document.querySelectorAll('.ne-type-btn').forEach(b => b.classList.remove('active'));
@@ -346,8 +395,9 @@
      'ne-task-sdate','ne-task-due','ne-memo-date'].forEach(id => {
       document.getElementById(id).value = '';
     });
-    document.getElementById('ne-recur').value   = '';
-    document.getElementById('ne-project').value = '';
+    document.getElementById('ne-recur').value = '';
+    document.getElementById('ne-org').value = '';
+    neRefreshBusinesses();
     document.getElementById('ne-error').textContent = '';
     document.getElementById('ne-chklist').innerHTML = '';
     const d = dateStr || '{{ today }}';
@@ -387,9 +437,16 @@
       return;
     }
     const type       = document.getElementById('ne-type').value;
+    const org_id     = document.getElementById('ne-org').value;
+    const business_id = document.getElementById('ne-business').value;
     const project_id = document.getElementById('ne-project').value;
     const body       = document.getElementById('ne-body').value.trim();
     const recurrence = document.getElementById('ne-recur').value;
+    if ((org_id || business_id) && !project_id) {
+      document.getElementById('ne-error').textContent = '소속에 연결하려면 프로젝트까지 선택하세요';
+      document.getElementById('ne-project').focus();
+      return;
+    }
 
     let scheduled_at = '', end_at = '', start_date = '', due_date = '';
     if (type === 'schedule') {

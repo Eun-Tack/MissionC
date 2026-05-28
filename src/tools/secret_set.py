@@ -4,7 +4,7 @@ secret_set.py — CLI for managing MC secrets in Windows Credential Manager.
 Usage:
     python -m src.tools.secret_set MC_GH_PAT
     python -m src.tools.secret_set MC_TG_BOT_TOKEN
-    python -m src.tools.secret_set MC_GOOGLE_OAUTH
+    python -m src.tools.secret_set MC_GCAL_TOKEN
     python -m src.tools.secret_set --list
     python -m src.tools.secret_set --delete MC_GH_PAT
 
@@ -22,7 +22,7 @@ except ImportError:
     print("[ERROR] keyring not installed: pip install keyring pywin32", file=sys.stderr)
     sys.exit(1)
 
-KNOWN_KEYS = ("MC_GH_PAT", "MC_TG_BOT_TOKEN", "MC_GOOGLE_OAUTH")
+KNOWN_KEYS = ("MC_GH_PAT", "MC_TG_BOT_TOKEN", "MC_GCAL_TOKEN")
 _KEYRING_USER = "iet03"
 
 

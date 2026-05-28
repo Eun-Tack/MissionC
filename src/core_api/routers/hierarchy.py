@@ -327,6 +327,8 @@ async def project_detail(
     request: Request,
     db: sqlite3.Connection = Depends(get_db),
 ):
+    from ..integrations import sync_github
+    await sync_github()
     proj = db.execute(
         """
         SELECT p.id, p.title, p.status, p.start_date, p.end_date,

@@ -111,10 +111,13 @@
   {% if step == 1 %}
   <div class="card">
     <div class="card-icon">📁</div>
-    <div class="card-title">MC-Notes 폴더를 선택해주세요</div>
+    <div class="card-title">노트 저장 폴더</div>
     <div class="card-sub">
-      메모, 프로젝트 파일이 저장될 로컬 폴더입니다.<br>
-      Google Drive for Desktop 동기화 폴더를 선택하면 자동으로 클라우드 백업됩니다.
+      MC가 메모·노트 파일(.md)을 저장하는 <strong>로컬 폴더</strong>입니다.<br>
+      <br>
+      클라우드 백업은 MC가 하지 않습니다. 폴더를 Google Drive·OneDrive·iCloud 안에 만들면 해당 서비스가 자동으로 동기화합니다.<br>
+      <br>
+      비워두면 <code>~/Documents/MC-Notes</code>를 사용합니다.
     </div>
 
     <form hx-post="/setup/step/folder" hx-target="body" hx-swap="innerHTML">
@@ -143,10 +146,10 @@
   {% elif step == 2 %}
   <div class="card">
     <div class="card-icon">🏢</div>
-    <div class="card-title">소속을 등록해주세요</div>
+    <div class="card-title">소속 등록</div>
     <div class="card-sub">
-      조직, 회사, 팀 등 소속을 입력합니다.<br>
-      나중에 설정에서 언제든 추가·수정할 수 있습니다.
+      회사, 팀, 개인 프로젝트 등 <strong>여러 소속을 모두 추가</strong>할 수 있습니다.<br>
+      각 소속 아래 사업·프로젝트를 계층으로 관리합니다.
     </div>
 
     <!-- Add org inline form -->

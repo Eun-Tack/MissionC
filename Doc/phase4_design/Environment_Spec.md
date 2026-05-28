@@ -75,7 +75,7 @@ C:\Users\iet03\Documents\Hub\agents\schedule\   ← 프로젝트 루트
 실행: python secret_bridge/main.py
 포트: 9999 (loopback + Docker host-gateway만 허용)
 역할: keyring(DPAPI) ↔ Docker 컨테이너 시크릿 중계
-허용 키: MC_GH_PAT, MC_TG_BOT_TOKEN, MC_GOOGLE_OAUTH (V1.1)
+허용 키: MC_GH_PAT, MC_TG_BOT_TOKEN, MC_GCAL_TOKEN (V1.1)
 ```
 
 #### notifier-daemon
@@ -155,7 +155,7 @@ services:
 |--------|---------------|------------------|-------------------|
 | GitHub PAT | `MC_GH_PAT` | `keyring.get_password("MC_GH_PAT", "iet03")` | `GET http://host.docker.internal:9999/secret/MC_GH_PAT` |
 | Telegram Bot Token | `MC_TG_BOT_TOKEN` | 동일 | 동일 |
-| Google OAuth (V1.1) | `MC_GOOGLE_OAUTH` | 동일 | 동일 |
+| Google Calendar OAuth (V1.1) | `MC_GCAL_TOKEN` | 동일 | 동일 |
 
 **.env 파일 정책**:
 - 비민감 변수만 (포트, 로그 레벨, 컨테이너 간 URL).

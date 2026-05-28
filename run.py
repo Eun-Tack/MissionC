@@ -6,6 +6,13 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).parent
+
+# Load .env for local development (no-op if file doesn't exist)
+try:
+    from dotenv import load_dotenv
+    load_dotenv(ROOT / ".env")
+except ImportError:
+    pass
 PROD = os.environ.get("MC_ENV", "development") == "production"
 
 

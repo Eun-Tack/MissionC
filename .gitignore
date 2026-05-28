@@ -33,6 +33,7 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+*.log
 
 # AI model cache (large binaries — download on demand)
 .whisper_cache/

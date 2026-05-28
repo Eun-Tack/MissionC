@@ -25,6 +25,10 @@ def _get_secret(key: str) -> str | None:
     try:
         import keyring
         val = keyring.get_password(key, "iet03")
+        if not val and key == "MC_GCAL_TOKEN":
+            val = keyring.get_password("MC_GOOGLE_OAUTH", "iet03")
+            if val:
+                keyring.set_password("MC_GCAL_TOKEN", "iet03", val)
         return val if val and val.strip() else None
     except Exception:
         return None
@@ -173,6 +177,101 @@ async def poll_telegram() -> None:
 
     except Exception as e:
         log.warning("Telegram poll error: %s", e)
+
+
+# ── Google Calendar sync (FR-CAL-02) ────────────────────────────────────────
+
+async def sync_gcal() -> None:
+    """Fetch GCal events (±7d / +30d window) → gcal_cache."""
+    import json, os
+    token_json = _get_secret("MC_GCAL_TOKEN")
+    if not token_json:
+        return
+
+    try:
+        token_data = json.loads(token_json)
+    except Exception:
+        return
+
+    access_token  = token_data.get("access_token")
+    refresh_token = token_data.get("refresh_token")
+    client_id     = os.environ.get("MC_GOOGLE_CLIENT_ID") or os.environ.get("GOOGLE_CLIENT_ID", "")
+    client_secret = os.environ.get("MC_GOOGLE_CLIENT_SECRET") or os.environ.get("GOOGLE_CLIENT_SECRET", "")
+
+    from datetime import timezone, timedelta
+    import httpx
+
+    now_dt   = datetime.now(timezone.utc)
+    time_min = (now_dt - timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    time_max = (now_dt + timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    _EVENTS_URL = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
+    _REFRESH_URL = "https://oauth2.googleapis.com/token"
+
+    async def _fetch(token: str):
+        async with httpx.AsyncClient(timeout=10) as c:
+            return await c.get(
+                _EVENTS_URL,
+                headers={"Authorization": f"Bearer {token}"},
+                params={"timeMin": time_min, "timeMax": time_max,
+                        "singleEvents": "true", "orderBy": "startTime", "maxResults": 100},
+            )
+
+    try:
+        r = await _fetch(access_token)
+
+        if r.status_code == 401 and refresh_token and client_id:
+            async with httpx.AsyncClient(timeout=10) as c:
+                ref = await c.post(_REFRESH_URL, data={
+                    "refresh_token": refresh_token,
+                    "client_id":     client_id,
+                    "client_secret": client_secret,
+                    "grant_type":    "refresh_token",
+                })
+            if ref.status_code == 200:
+                access_token = ref.json()["access_token"]
+                token_data["access_token"] = access_token
+                try:
+                    import keyring as kr
+                    kr.set_password("MC_GCAL_TOKEN", "iet03", json.dumps(token_data))
+                except Exception:
+                    pass
+                r = await _fetch(access_token)
+            else:
+                log.warning("GCal token refresh failed (%s)", ref.status_code)
+                return
+
+        if r.status_code != 200:
+            log.warning("GCal sync failed: %s", r.status_code)
+            return
+
+        events = r.json().get("items", [])
+        now_str = _now()
+
+        from .db import get_connection
+        with get_connection() as db:
+            for ev in events:
+                start = ev.get("start", {})
+                end   = ev.get("end", {})
+                start_at = start.get("dateTime") or (start.get("date", "") + "T00:00:00Z")
+                end_at   = end.get("dateTime")   or (end.get("date", "")   + "T00:00:00Z")
+                db.execute(
+                    """INSERT INTO gcal_cache
+                       (gcal_event_id, calendar_id, title, start_at, end_at,
+                        description, location, fetched_at)
+                       VALUES (?, 'primary', ?, ?, ?, ?, ?, ?)
+                       ON CONFLICT(gcal_event_id) DO UPDATE SET
+                         title=excluded.title, start_at=excluded.start_at,
+                         end_at=excluded.end_at, description=excluded.description,
+                         location=excluded.location, fetched_at=excluded.fetched_at""",
+                    (ev["id"], ev.get("summary", "(제목 없음)"),
+                     start_at, end_at,
+                     ev.get("description"), ev.get("location"), now_str),
+                )
+        log.info("GCal sync OK: %d events", len(events))
+
+    except Exception as e:
+        log.error("GCal sync error: %s", e)
 
 
 # ── Folder auto-creation (FR-FILES-01) ──────────────────────────────────────

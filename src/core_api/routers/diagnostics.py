@@ -67,7 +67,7 @@ async def diagnostics(request: Request, db: sqlite3.Connection = Depends(get_db)
     creds = {
         "GitHub PAT": _secret_status("MC_GH_PAT"),
         "Telegram Bot": _secret_status("MC_TG_BOT_TOKEN"),
-        "Google OAuth": _secret_status("MC_GOOGLE_OAUTH"),
+        "Google Calendar": _secret_status("MC_GCAL_TOKEN"),
     }
 
     # Last GitHub sync

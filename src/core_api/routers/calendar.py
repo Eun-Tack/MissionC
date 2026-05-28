@@ -144,6 +144,8 @@ async def calendar_page(
     date_str: str = "",
     db: sqlite3.Connection = Depends(get_db),
 ):
+    from ..integrations import sync_gcal
+    await sync_gcal()
     anchor = _parse_date(date_str)
     ctx = _build_calendar_context(db, mode, anchor)
     return templates.TemplateResponse(request, "calendar.html", ctx)
@@ -199,8 +201,18 @@ def _build_calendar_context(db: sqlite3.Connection, mode: str, anchor: date) -> 
         allday_by_day[day_str] = allday
         timed_by_day[day_str]  = timed
 
+    organizations = db.execute(
+        "SELECT id, name FROM organizations ORDER BY name"
+    ).fetchall()
+    businesses = db.execute(
+        """SELECT b.id, b.name, b.org_id, o.name AS org_name
+           FROM businesses b
+           LEFT JOIN organizations o ON o.id = b.org_id
+           ORDER BY o.name, b.name"""
+    ).fetchall()
     projects = db.execute(
-        """SELECT p.id, p.title, b.name AS biz_name, o.name AS org_name
+        """SELECT p.id, p.title, p.business_id, b.name AS biz_name,
+                  b.org_id, o.name AS org_name
            FROM projects p
            LEFT JOIN businesses b ON b.id = p.business_id
            LEFT JOIN organizations o ON o.id = b.org_id
@@ -222,6 +234,8 @@ def _build_calendar_context(db: sqlite3.Connection, mode: str, anchor: date) -> 
         "timed_by_day":  timed_by_day,
         "prev_anchor":   prev_anchor.isoformat(),
         "next_anchor":   next_anchor.isoformat(),
+        "organizations": [dict(o) for o in organizations],
+        "businesses":    [dict(b) for b in businesses],
         "projects":      [dict(p) for p in projects],
         # Time grid constants
         "grid_start_h":  _GRID_START_H,

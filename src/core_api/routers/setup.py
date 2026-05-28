@@ -36,11 +36,14 @@ from fastapi.templating import Jinja2Templates
 
 from ..db import get_db
 from ..config import reload_config
+from .auth import has_gcal_token
 
 router = APIRouter()
 templates = Jinja2Templates(directory=Path(__file__).parent.parent / "templates")
 
 _KEYRING_USER = "iet03"
+_GCAL_SECRET_KEY = "MC_GCAL_TOKEN"
+_LEGACY_GCAL_SECRET_KEY = "MC_GOOGLE_OAUTH"
 _ORG_COLORS = [
     ("oklch(58% 0.18 280)", "보라"),
     ("oklch(55% 0.20 145)", "초록"),
@@ -96,7 +99,15 @@ def _try_get_secret(key: str) -> str | None:
     # 2. Local Windows Credential Manager
     try:
         import keyring
-        return keyring.get_password(key, _KEYRING_USER)
+        val = keyring.get_password(key, _KEYRING_USER)
+        if val:
+            return val
+        if key == _GCAL_SECRET_KEY:
+            legacy = keyring.get_password(_LEGACY_GCAL_SECRET_KEY, _KEYRING_USER)
+            if legacy:
+                keyring.set_password(_GCAL_SECRET_KEY, _KEYRING_USER, legacy)
+                return legacy
+        return None
     except Exception:
         return None
 
@@ -154,6 +165,64 @@ async def _test_github(token: str) -> tuple[bool, str]:
         return False, f"오류: {e}"
 
 
+async def _test_gcal() -> tuple[bool, str]:
+    try:
+        import json, os, httpx
+        token_json = _try_get_secret(_GCAL_SECRET_KEY)
+        if not token_json:
+            return False, "토큰 없음"
+        token_data = json.loads(token_json)
+        access_token = token_data.get("access_token", "")
+        refresh_token = token_data.get("refresh_token", "")
+        client_id = os.environ.get("MC_GOOGLE_CLIENT_ID") or os.environ.get("GOOGLE_CLIENT_ID", "")
+        client_secret = os.environ.get("MC_GOOGLE_CLIENT_SECRET") or os.environ.get("GOOGLE_CLIENT_SECRET", "")
+
+        async def _refresh() -> str | None:
+            if not refresh_token or not client_id:
+                return None
+            async with httpx.AsyncClient(timeout=8) as client:
+                ref = await client.post("https://oauth2.googleapis.com/token", data={
+                    "refresh_token": refresh_token,
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "grant_type": "refresh_token",
+                })
+            if ref.status_code == 200:
+                refreshed = ref.json().get("access_token", "")
+                token_data["access_token"] = refreshed
+                try:
+                    import keyring
+                    keyring.set_password(_GCAL_SECRET_KEY, _KEYRING_USER, json.dumps(token_data))
+                except Exception:
+                    pass
+                return refreshed
+            raise RuntimeError(f"토큰 갱신 실패 ({ref.status_code})")
+
+        if not access_token:
+            access_token = await _refresh()
+            if not access_token:
+                return False, "access_token 없음"
+
+        async with httpx.AsyncClient(timeout=8) as client:
+            r = await client.get(
+                "https://www.googleapis.com/calendar/v3/calendars/primary",
+                headers={"Authorization": f"Bearer {access_token}"},
+            )
+            if r.status_code == 401 and refresh_token:
+                access_token = await _refresh()
+                if access_token:
+                    r = await client.get(
+                        "https://www.googleapis.com/calendar/v3/calendars/primary",
+                        headers={"Authorization": f"Bearer {access_token}"},
+                    )
+            if r.status_code == 200:
+                summary = r.json().get("summary", "primary")
+                return True, f"연결됨 — {summary}"
+            return False, f"인증 실패 ({r.status_code})"
+    except Exception as e:
+        return False, f"오류: {e}"
+
+
 async def _test_telegram(token: str) -> tuple[bool, str]:
     try:
         import httpx
@@ -170,6 +239,12 @@ async def _test_telegram(token: str) -> tuple[bool, str]:
 @router.get("/settings/test/{service}", response_class=HTMLResponse)
 async def test_integration(service: str):
     token = _try_get_secret(f"MC_{service.upper()}_PAT" if service == "gh" else f"MC_{service.upper()}_BOT_TOKEN")
+    if service == "gcal":
+        ok, msg = await _test_gcal()
+        color = "var(--st-done)" if ok else "oklch(60% 0.21 25)"
+        icon  = "✓" if ok else "✕"
+        return HTMLResponse(f'<span style="color:{color}; font-size:12px;">{icon} {msg}</span>')
+
     if service == "gh":
         token = _try_get_secret("MC_GH_PAT")
     elif service == "tg":
@@ -182,10 +257,8 @@ async def test_integration(service: str):
 
     if service == "gh":
         ok, msg = await _test_github(token)
-    elif service == "tg":
-        ok, msg = await _test_telegram(token)
     else:
-        return HTMLResponse("")
+        ok, msg = await _test_telegram(token)
 
     color = "var(--st-done)" if ok else "oklch(60% 0.21 25)"
     icon  = "✓" if ok else "✕"
@@ -212,14 +285,13 @@ async def setup_get(request: Request, step: int = 1, db: sqlite3.Connection = De
             "org_colors": _ORG_COLORS,
             "gh_set":  _secret_is_set("MC_GH_PAT"),
             "tg_set":  _secret_is_set("MC_TG_BOT_TOKEN"),
-            "gcal_set": _secret_is_set("MC_GOOGLE_OAUTH"),
+            "gcal_set": has_gcal_token() or _secret_is_set(_GCAL_SECRET_KEY),
         },
     )
 
 
-@router.post("/setup/step/folder", response_class=HTMLResponse)
+@router.post("/setup/step/folder")
 async def setup_folder(
-    request: Request,
     notes_root: Annotated[str, Form()] = "",
     db: sqlite3.Connection = Depends(get_db),
 ):
@@ -229,36 +301,33 @@ async def setup_folder(
         _save_setting(db, "mc_notes_root", path)
         (Path(path) / "inbox").mkdir(exist_ok=True)
     reload_config()
-    return HTMLResponse(
-        '<div hx-get="/setup?step=2" hx-trigger="load" hx-target="body" hx-swap="innerHTML"></div>'
-    )
+    from fastapi.responses import Response
+    r = Response(status_code=200)
+    r.headers["HX-Redirect"] = "/setup?step=2"
+    return r
 
 
-@router.post("/setup/step/orgs", response_class=HTMLResponse)
-async def setup_orgs(
-    request: Request,
-    db: sqlite3.Connection = Depends(get_db),
-):
-    # All orgs saved incrementally via /settings/org; just advance step
-    return HTMLResponse(
-        '<div hx-get="/setup?step=3" hx-trigger="load" hx-target="body" hx-swap="innerHTML"></div>'
-    )
+@router.post("/setup/step/orgs")
+async def setup_orgs():
+    from fastapi.responses import Response
+    r = Response(status_code=200)
+    r.headers["HX-Redirect"] = "/setup?step=3"
+    return r
 
 
-@router.post("/setup/step/integrations", response_class=HTMLResponse)
+@router.post("/setup/step/integrations")
 async def setup_integrations(
-    request: Request,
-    gh_token:  Annotated[str, Form()] = "",
-    tg_token:  Annotated[str, Form()] = "",
-    db: sqlite3.Connection = Depends(get_db),
+    gh_token: Annotated[str, Form()] = "",
+    tg_token: Annotated[str, Form()] = "",
 ):
     if gh_token.strip():
         _try_save_secret("MC_GH_PAT", gh_token.strip())
     if tg_token.strip():
         _try_save_secret("MC_TG_BOT_TOKEN", tg_token.strip())
-    return HTMLResponse(
-        '<div hx-get="/setup?step=4" hx-trigger="load" hx-target="body" hx-swap="innerHTML"></div>'
-    )
+    from fastapi.responses import Response
+    r = Response(status_code=200)
+    r.headers["HX-Redirect"] = "/setup?step=4"
+    return r
 
 
 @router.post("/setup/complete")
@@ -320,7 +389,7 @@ async def settings_get(request: Request, db: sqlite3.Connection = Depends(get_db
             "labels":       [dict(l) for l in labels],
             "gh_set":       _secret_is_set("MC_GH_PAT"),
             "tg_set":       _secret_is_set("MC_TG_BOT_TOKEN"),
-            "gcal_set":     _secret_is_set("MC_GOOGLE_OAUTH"),
+            "gcal_set":     has_gcal_token() or _secret_is_set(_GCAL_SECRET_KEY),
         },
     )
 
@@ -502,7 +571,7 @@ async def settings_credential(
     token:   Annotated[str, Form()],
 ):
     """Store a secret in Windows Credential Manager (ADR-005)."""
-    key_map = {"gh": "MC_GH_PAT", "tg": "MC_TG_BOT_TOKEN", "gcal": "MC_GOOGLE_OAUTH"}
+    key_map = {"gh": "MC_GH_PAT", "tg": "MC_TG_BOT_TOKEN", "gcal": _GCAL_SECRET_KEY}
     key = key_map.get(service)
     if not key:
         return HTMLResponse('<span style="color:oklch(60% 0.21 25)">알 수 없는 서비스</span>', status_code=422)

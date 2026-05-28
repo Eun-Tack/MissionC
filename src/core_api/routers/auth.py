@@ -15,8 +15,10 @@ GOOGLE_CLIENT_ID 미설정 시 인증 건너뜀 (로컬 개발 편의).
 """
 
 from __future__ import annotations
+import json
 import os
 import secrets
+from urllib.parse import urlencode
 
 import httpx
 from fastapi import APIRouter, Request
@@ -32,7 +34,11 @@ _GOOGLE_AUTH_URL  = "https://accounts.google.com/o/oauth2/v2/auth"
 _GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 _GOOGLE_USER_URL  = "https://www.googleapis.com/oauth2/v3/userinfo"
 
-_SCOPE = "openid email profile"
+_SCOPE      = "openid email profile"
+_GCAL_SCOPE = "https://www.googleapis.com/auth/calendar.readonly"
+_KEYRING_USER = "iet03"
+_GCAL_SECRET_KEY = "MC_GCAL_TOKEN"
+_LEGACY_GCAL_SECRET_KEY = "MC_GOOGLE_OAUTH"
 
 
 def _cfg() -> dict:
@@ -42,6 +48,45 @@ def _cfg() -> dict:
         "allowed_email": os.environ.get("ALLOWED_EMAIL", ""),
         "app_url":       os.environ.get("APP_URL", "http://localhost:8000"),
     }
+
+
+def _gcal_cfg() -> dict:
+    """GCal 전용 credentials — MC_GOOGLE_CLIENT_ID/SECRET 우선, GOOGLE_* fallback."""
+    return {
+        "client_id":     os.environ.get("MC_GOOGLE_CLIENT_ID") or os.environ.get("GOOGLE_CLIENT_ID", ""),
+        "client_secret": os.environ.get("MC_GOOGLE_CLIENT_SECRET") or os.environ.get("GOOGLE_CLIENT_SECRET", ""),
+        "app_url":       os.environ.get("APP_URL", "http://localhost:8000"),
+    }
+
+
+def _callback_base(request: Request, configured_app_url: str) -> str:
+    base = (configured_app_url or "").strip().rstrip("/")
+    if base:
+        return base
+    return f"{request.url.scheme}://{request.url.netloc}"
+
+
+def _load_gcal_token() -> dict:
+    try:
+        import keyring
+        token_json = keyring.get_password(_GCAL_SECRET_KEY, _KEYRING_USER)
+        if not token_json:
+            token_json = keyring.get_password(_LEGACY_GCAL_SECRET_KEY, _KEYRING_USER)
+            if token_json:
+                keyring.set_password(_GCAL_SECRET_KEY, _KEYRING_USER, token_json)
+        return json.loads(token_json) if token_json else {}
+    except Exception:
+        return {}
+
+
+def _save_gcal_token(token_data: dict) -> None:
+    import keyring
+    keyring.set_password(_GCAL_SECRET_KEY, _KEYRING_USER, json.dumps(token_data))
+
+
+def has_gcal_token() -> bool:
+    data = _load_gcal_token()
+    return bool(data.get("refresh_token") or data.get("access_token"))
 
 
 def auth_enabled() -> bool:
@@ -144,6 +189,74 @@ async def callback(request: Request, code: str = "", state: str = "", error: str
 async def logout(request: Request):
     request.session.clear()
     return RedirectResponse("/auth/login")
+
+
+# ── Google Calendar OAuth ─────────────────────────────────────────────────────
+
+@router.get("/gcal/connect")
+async def gcal_connect(request: Request):
+    """GCal OAuth 시작 — calendar.readonly 스코프."""
+    if has_gcal_token() and request.query_params.get("force") != "1":
+        return RedirectResponse("/settings?gcal=connected")
+
+    cfg = _gcal_cfg()
+    if not cfg["client_id"]:
+        return HTMLResponse("MC_GOOGLE_CLIENT_ID 미설정 — .env 파일을 확인하세요.", status_code=500)
+
+    state = secrets.token_urlsafe(16)
+    request.session["gcal_state"] = state
+
+    callback_url = f"{_callback_base(request, cfg['app_url'])}/auth/gcal/callback"
+    url = f"{_GOOGLE_AUTH_URL}?{urlencode({
+        'client_id': cfg['client_id'],
+        'redirect_uri': callback_url,
+        'response_type': 'code',
+        'scope': _GCAL_SCOPE,
+        'state': state,
+        'access_type': 'offline',
+        'prompt': 'consent',
+        'include_granted_scopes': 'true',
+    })}"
+    return RedirectResponse(url)
+
+
+@router.get("/gcal/callback")
+async def gcal_callback(request: Request, code: str = "", state: str = "", error: str = ""):
+    """GCal OAuth 콜백 — 토큰 저장 후 /settings 로 리디렉트."""
+    cfg = _gcal_cfg()
+
+    if error:
+        return HTMLResponse(_error_page(f"GCal 연결 거절: {error}"), status_code=403)
+
+    if state != request.session.pop("gcal_state", None):
+        return HTMLResponse(_error_page("state 불일치. 다시 시도해주세요."), status_code=400)
+
+    callback_url = f"{_callback_base(request, cfg['app_url'])}/auth/gcal/callback"
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        token_res = await client.post(_GOOGLE_TOKEN_URL, data={
+            "code":          code,
+            "client_id":     cfg["client_id"],
+            "client_secret": cfg["client_secret"],
+            "redirect_uri":  callback_url,
+            "grant_type":    "authorization_code",
+        })
+        if token_res.status_code != 200:
+            return HTMLResponse(_error_page(f"GCal 토큰 교환 실패: {token_res.text}"), status_code=500)
+
+    tokens = token_res.json()
+    existing = _load_gcal_token()
+    token_data = {
+        "access_token":  tokens.get("access_token", ""),
+        "refresh_token": tokens.get("refresh_token") or existing.get("refresh_token", ""),
+        "token_type":    tokens.get("token_type", "Bearer"),
+    }
+    try:
+        _save_gcal_token(token_data)
+    except Exception as e:
+        return HTMLResponse(_error_page(f"토큰 저장 실패: {e}"), status_code=500)
+
+    return RedirectResponse("/settings?gcal=connected")
 
 
 # ── 에러 페이지 ───────────────────────────────────────────────────────────────

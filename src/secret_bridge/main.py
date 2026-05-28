@@ -12,7 +12,7 @@ import ipaddress
 from fastapi import FastAPI, HTTPException, Request
 import keyring
 
-ALLOWED_KEYS = {"MC_GH_PAT", "MC_TG_BOT_TOKEN", "MC_GOOGLE_OAUTH"}
+ALLOWED_KEYS = {"MC_GH_PAT", "MC_TG_BOT_TOKEN", "MC_GCAL_TOKEN"}
 _KEYRING_USER = "iet03"
 
 app = FastAPI(title="MC secret-bridge", docs_url=None, redoc_url=None)

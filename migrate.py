@@ -16,7 +16,7 @@ SCHEMA_PATH  = PROJECT_ROOT / "Doc" / "phase4_design" / "schema" / "mc_schema.sq
 DB_DIR       = PROJECT_ROOT / "data"
 DB_PATH      = Path(os.environ.get("MC_DB_PATH", DB_DIR / "mc.db"))
 
-EXPECTED_VERSION = 8   # v1.8: contacts + item_contacts
+EXPECTED_VERSION = 10  # v1.10: allow recurrence as an item source
 
 
 def _user_version(conn: sqlite3.Connection) -> int:
@@ -86,6 +86,97 @@ def _migrate_7_to_8(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def _migrate_8_to_9(conn: sqlite3.Connection) -> None:
+    """v8 -> v9: rename Google OAuth key setting to the actual GCal token key."""
+    conn.execute(
+        """UPDATE settings
+           SET key='keyring_target_gcal_token', value='MC_GCAL_TOKEN'
+           WHERE key='keyring_target_google_oauth'"""
+    )
+    conn.commit()
+
+
+def _migrate_9_to_10(conn: sqlite3.Connection) -> None:
+    """v9 -> v10: allow source='recurrence' on items."""
+    conn.commit()
+    conn.execute("PRAGMA foreign_keys=OFF")
+    conn.execute("PRAGMA legacy_alter_table=ON")
+    conn.execute("ALTER TABLE items RENAME TO items_old")
+    conn.execute(
+        """
+        CREATE TABLE items (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            type         TEXT    NOT NULL CHECK(type IN ('schedule','task','memo','project_ref')),
+            title        TEXT    NOT NULL,
+            body         TEXT,
+            body_inline  INTEGER NOT NULL DEFAULT 0,
+            status       TEXT    NOT NULL DEFAULT 'todo'
+                                 CHECK(status IN ('todo','doing','done','waiting','cancelled')),
+            location     TEXT    NOT NULL DEFAULT 'hot'
+                                 CHECK(location IN ('hot','cold')),
+            scheduled_at TEXT,
+            due_at       TEXT,
+            start_date   TEXT,
+            due_date     TEXT,
+            parent_id              INTEGER REFERENCES items(id) ON DELETE CASCADE,
+            folder_path            TEXT,
+            recurrence_rule        TEXT,
+            recurrence_parent_id   INTEGER REFERENCES items(id),
+            created_at   TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            updated_at   TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            source       TEXT    NOT NULL DEFAULT 'manual'
+                                 CHECK(source IN ('manual','telegram','voice','github','recurrence')),
+            cold_path    TEXT
+        )
+        """
+    )
+    old_cols = {
+        row[1] for row in conn.execute("PRAGMA table_info(items_old)").fetchall()
+    }
+    new_cols = [
+        "id", "type", "title", "body", "body_inline", "status", "location",
+        "scheduled_at", "due_at", "start_date", "due_date", "parent_id",
+        "folder_path", "recurrence_rule", "recurrence_parent_id",
+        "created_at", "updated_at", "source", "cold_path",
+    ]
+    cols = [col for col in new_cols if col in old_cols]
+    conn.execute(
+        f"INSERT INTO items ({', '.join(cols)}) SELECT {', '.join(cols)} FROM items_old"
+    )
+    conn.execute("DROP TABLE items_old")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_items_parent ON items(parent_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_items_status ON items(status)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_items_scheduled_at ON items(scheduled_at)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_items_updated_at ON items(updated_at)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_items_location ON items(location)")
+    conn.execute("DROP TRIGGER IF EXISTS items_ai")
+    conn.execute("DROP TRIGGER IF EXISTS items_ad")
+    conn.execute("DROP TRIGGER IF EXISTS items_au")
+    conn.execute(
+        """CREATE TRIGGER items_ai AFTER INSERT ON items BEGIN
+               INSERT INTO items_fts(rowid, title, body) VALUES (new.id, new.title, new.body);
+           END"""
+    )
+    conn.execute(
+        """CREATE TRIGGER items_ad AFTER DELETE ON items BEGIN
+               INSERT INTO items_fts(items_fts, rowid, title, body) VALUES ('delete', old.id, old.title, old.body);
+           END"""
+    )
+    conn.execute(
+        """CREATE TRIGGER items_au AFTER UPDATE ON items BEGIN
+               INSERT INTO items_fts(items_fts, rowid, title, body) VALUES ('delete', old.id, old.title, old.body);
+               INSERT INTO items_fts(rowid, title, body) VALUES (new.id, new.title, new.body);
+           END"""
+    )
+    try:
+        conn.execute("INSERT INTO items_fts(items_fts) VALUES ('rebuild')")
+    except sqlite3.DatabaseError:
+        pass
+    conn.commit()
+    conn.execute("PRAGMA legacy_alter_table=OFF")
+    conn.execute("PRAGMA foreign_keys=ON")
+
+
 def migrate(check_only: bool = False) -> bool:
     DB_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -125,6 +216,14 @@ def migrate(check_only: bool = False) -> bool:
         if current_ver == 7:
             print("[MIG]   v7 → v8 (contacts + item_contacts)")
             _migrate_7_to_8(conn)
+            current_ver = 8
+        if current_ver == 8:
+            print("[MIG]   v8 → v9 (normalize Google Calendar secret key setting)")
+            _migrate_8_to_9(conn)
+            current_ver = 9
+        if current_ver == 9:
+            print("[MIG]   v9 → v10 (allow recurrence item source)")
+            _migrate_9_to_10(conn)
         conn.execute(f"PRAGMA user_version = {EXPECTED_VERSION}")
         conn.commit()
         print(f"[OK]    user_version={EXPECTED_VERSION}")

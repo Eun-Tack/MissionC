@@ -24,7 +24,7 @@ BR-AUTH-01: "PAT는 Windows Credential Manager에 저장, .env 평문 금지".
 │  ┌─────────────────────────────────────────────────────┐ │
 │  │ Target: MC_GH_PAT          User: iet03              │ │
 │  │ Target: MC_TG_BOT_TOKEN    User: iet03              │ │
-│  │ Target: MC_GOOGLE_OAUTH    User: iet03   (V1.1)     │ │
+│  │ Target: MC_GCAL_TOKEN      User: iet03   (V1.1)     │ │
 │  └─────────────────────────────────────────────────────┘ │
 └──────────────────────────────────────────────────────────┘
         ▲                                 ▲
@@ -59,7 +59,7 @@ BR-AUTH-01: "PAT는 Windows Credential Manager에 저장, .env 평문 금지".
 from fastapi import FastAPI, HTTPException, Request
 import keyring, ipaddress
 
-ALLOWED_KEYS = {"MC_GH_PAT", "MC_TG_BOT_TOKEN", "MC_GOOGLE_OAUTH"}
+ALLOWED_KEYS = {"MC_GH_PAT", "MC_TG_BOT_TOKEN", "MC_GCAL_TOKEN"}
 app = FastAPI()
 
 @app.middleware("http")

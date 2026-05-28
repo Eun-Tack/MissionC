@@ -17,19 +17,26 @@ from .routers import flow, items, hierarchy, review, setup, inbox, diagnostics, 
 log = logging.getLogger("mc.main")
 
 _STATIC_DIR = Path(__file__).parent / "static"
+_PROJECT_ROOT = Path(__file__).parent.parent.parent
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv(_PROJECT_ROOT / ".env")
+except ImportError:
+    pass
 
 
 def _start_scheduler():
+    # Background polling disabled for local use — syncs happen on-demand per page.
+    # Re-enable when deploying to cloud (Railway).
     try:
         from apscheduler.schedulers.asyncio import AsyncIOScheduler
-        from .integrations import sync_github, poll_telegram, expire_stale_inbox
+        from .integrations import expire_stale_inbox
 
         sched = AsyncIOScheduler(timezone="UTC")
-        sched.add_job(sync_github,        "interval", minutes=15, id="gh_sync",      misfire_grace_time=60)
-        sched.add_job(poll_telegram,      "interval", seconds=30, id="tg_poll",      misfire_grace_time=10)
-        sched.add_job(expire_stale_inbox, "interval", hours=6,    id="inbox_expire", misfire_grace_time=600)
+        sched.add_job(expire_stale_inbox, "interval", hours=6, id="inbox_expire", misfire_grace_time=600)
         sched.start()
-        log.info("APScheduler started (gh_sync=15m, tg_poll=30s, inbox_expire=6h)")
+        log.info("APScheduler started (inbox_expire=6h; gh/tg/gcal on-demand)")
         return sched
     except ImportError:
         log.warning("apscheduler not installed — background tasks disabled")
@@ -53,11 +60,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Session middleware (required for Google OAuth)
-_SESSION_SECRET = os.environ.get("SESSION_SECRET", "mc-dev-secret-change-in-prod")
-app.add_middleware(SessionMiddleware, secret_key=_SESSION_SECRET, https_only=False)
-
-# Auth guard — redirect to /auth/login when not authenticated
+# Auth guard must be registered BEFORE SessionMiddleware so that after reversal
+# SessionMiddleware wraps auth_guard (SessionMiddleware runs first on each request).
 _PUBLIC_PREFIXES = ("/auth/", "/health", "/static/", "/favicon")
 
 @app.middleware("http")
@@ -68,6 +72,10 @@ async def auth_guard(request: Request, call_next):
     if not auth.is_authenticated(request):
         return RedirectResponse("/auth/login")
     return await call_next(request)
+
+# SessionMiddleware added last → outermost layer → runs before auth_guard
+_SESSION_SECRET = os.environ.get("SESSION_SECRET", "mc-dev-secret-change-in-prod")
+app.add_middleware(SessionMiddleware, secret_key=_SESSION_SECRET, https_only=False)
 
 # Static files (app.js, radial.css, radial.js …)
 _STATIC_DIR.mkdir(parents=True, exist_ok=True)

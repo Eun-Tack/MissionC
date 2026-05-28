@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS items (
     created_at   TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
     updated_at   TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
     source       TEXT    NOT NULL DEFAULT 'manual'
-                         CHECK(source IN ('manual','telegram','voice','github')),
+                         CHECK(source IN ('manual','telegram','voice','github','recurrence')),
     cold_path    TEXT                               -- Google Drive path, V1.1
 );
 CREATE INDEX IF NOT EXISTS idx_items_parent ON items(parent_id);
@@ -347,7 +347,7 @@ INSERT OR IGNORE INTO settings(key, value) VALUES
     ('semantic_search_min_items',      '30'),
     ('keyring_target_gh_pat',          'MC_GH_PAT'),
     ('keyring_target_tg_bot',          'MC_TG_BOT_TOKEN'),
-    ('keyring_target_google_oauth',    'MC_GOOGLE_OAUTH'),
+    ('keyring_target_gcal_token',      'MC_GCAL_TOKEN'),
     ('secret_bridge_url',              'http://127.0.0.1:9999'),
     ('embedding_model',                'KoE5'),
     ('embedding_dim',                  '384'),

@@ -90,6 +90,30 @@ class TestItemsAPI:
         r2 = client.patch(f"/api/items/{iid}", data={"status": "nonsense"})
         assert r2.status_code == 422
 
+    def test_recurring_completion_spawns_recurrence_source(self, client):
+        client.post(
+            "/api/items",
+            data={
+                "title": "RecurringDaily",
+                "type": "task",
+                "due_date": "2026-05-27",
+                "recurrence_rule": "DAILY",
+            },
+        )
+        items = client.get("/api/export").json()["items"]
+        iid = next(i["id"] for i in items if i["title"] == "RecurringDaily")
+
+        r = client.patch(f"/api/items/{iid}", data={"status": "done"})
+        assert r.status_code == 200
+
+        items = client.get("/api/export").json()["items"]
+        spawned = [
+            i for i in items
+            if i["title"] == "RecurringDaily" and i["recurrence_parent_id"] == iid
+        ]
+        assert spawned
+        assert spawned[-1]["source"] == "recurrence"
+
     def test_delete_item(self, client):
         client.post("/api/items", data={"title": "ToDelete", "type": "task"})
         r = client.get("/api/export")
@@ -236,6 +260,15 @@ class TestPageSmoke:
     def test_page_ok(self, client, path):
         r = client.get(path)
         assert r.status_code == 200, f"{path} returned {r.status_code}: {r.text[:200]}"
+
+    def test_calendar_new_event_has_org_project_chain(self, client):
+        r = client.get("/calendar")
+        assert r.status_code == 200
+        assert 'id="ne-org"' in r.text
+        assert 'id="ne-business"' in r.text
+        assert 'id="ne-project"' in r.text
+        assert "NE_BUSINESSES" in r.text
+        assert "NE_PROJECTS" in r.text
 
     def test_voice_status_structure(self, client):
         r = client.get("/api/voice/status")

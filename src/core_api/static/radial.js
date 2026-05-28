@@ -76,6 +76,7 @@ class RadialPalette {
       const el = document.createElement('div');
       el.className = 'radial-label';
       el.id = `r-label-${i}`;
+      el.dataset.idx = i;
       el.style.left = `${lx}%`;
       el.style.top  = `${ly}%`;
       el.innerHTML = `
@@ -165,6 +166,7 @@ class RadialPalette {
       .addEventListener('click', () => this.hide());
 
     const svg = document.getElementById('radial-svg');
+    const wheel = this.root.querySelector('.radial-wheel');
 
     /* Slice click → execute (BR-RADIAL-13) */
     svg.addEventListener('click', (e) => {
@@ -172,11 +174,32 @@ class RadialPalette {
       if (path) this._execute(parseInt(path.dataset.idx));
     });
 
+    document.getElementById('radial-labels').addEventListener('click', (e) => {
+      const label = e.target.closest('.radial-label');
+      if (label) this._execute(parseInt(label.dataset.idx));
+    });
+
+    document.getElementById('radial-hub').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const form = document.getElementById('hub-form');
+      if (form.hidden && this.focusedIdx !== null) this._execute(this.focusedIdx);
+    });
+
     /* Slice hover → focus */
     svg.addEventListener('mouseover', (e) => {
       const path = e.target.closest('.radial-slice');
       if (path) this._focus(parseInt(path.dataset.idx), false);
     });
+
+    wheel.addEventListener('click', (e) => {
+      if (e.target.closest('#radial-hub, .radial-search-panel')) return;
+      const idx = this._sliceFromPoint(e.clientX, e.clientY);
+      if (idx !== null) {
+        e.preventDefault();
+        e.stopPropagation();
+        this._execute(idx);
+      }
+    }, true);
   }
 
   /* ── Show / Hide (BR-RADIAL-40) ────────────────────────────── */
@@ -244,6 +267,22 @@ class RadialPalette {
     }
   }
 
+  _sliceFromPoint(clientX, clientY) {
+    const wheel = this.root.querySelector('.radial-wheel');
+    const rect = wheel.getBoundingClientRect();
+    const x = clientX - rect.left - rect.width / 2;
+    const y = clientY - rect.top - rect.height / 2;
+    const scale = rect.width / 480;
+    const dist = Math.hypot(x, y) / scale;
+    if (dist < R_INNER || dist > R_OUTER) return null;
+    const deg = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+    return SLICES.findIndex(s => {
+      const start = (s.angle + 360) % 360;
+      const end = (s.angle + 45 + 360) % 360;
+      return start < end ? deg >= start && deg < end : deg >= start || deg < end;
+    });
+  }
+
   _clearFocus() {
     this.root.querySelectorAll('.radial-slice.focused, .radial-label.focused')
       .forEach(el => el.classList.remove('focused'));
@@ -262,6 +301,10 @@ class RadialPalette {
     if (el?.classList.contains('disabled')) {
       this._shake(el);
       return;
+    }
+
+    if (slice.pattern !== 'inline-form' && !document.getElementById('hub-form').hidden) {
+      this._closeInlineForm(true);
     }
 
     const ctx = this._context();
@@ -579,6 +622,7 @@ function _initRadial() {
   window.radialPalette = new RadialPalette();
   window.openRadial  = () => window.radialPalette?.show();
   window.closeRadial = () => window.radialPalette?.hide();
+  window.addEventListener('pageshow', () => window.radialPalette?.hide());
 }
 
 if (document.readyState === 'loading') {

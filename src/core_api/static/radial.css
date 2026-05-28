@@ -95,7 +95,8 @@
   align-items: center;
   gap: 3px;
   transform: translate(-50%, -50%);
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: pointer;
   transition: opacity 80ms ease-out;
 }
 .radial-label .r-symbol { font-size: 18px; line-height: 1; }

@@ -23,7 +23,7 @@ from datetime import datetime, date, timedelta, timezone
 from html import escape
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Response
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from ..db import get_db
@@ -289,7 +289,8 @@ async def update_item(
     if on_flow_page:
         dot_oob = f'<span id="dot-{item_id}" hx-swap-oob="true"><span class="mc-dot" data-status="{new_status}"></span></span>'
 
-    return HTMLResponse(f"{dot_oob}\n{extra_oob}")
+    status_marker = f'<span hidden data-status="{escape(new_status)}">{escape(new_status)}</span>'
+    return HTMLResponse(f"{dot_oob}\n{extra_oob}\n{status_marker}")
 
 
 # ── Project linking (FR-CAP-01 AC-5) ─────────────────────────────────────────
