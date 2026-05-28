@@ -40,6 +40,9 @@ The expanded philosophy and concept definitions live in
 The current closing-loop graph review and cleanup candidates live in
 `Doc/CLOSING_GRAPH_REVIEW.md`.
 
+The closing outcome and project close summary model lives in
+`Doc/CLOSING_OUTCOME_MODEL.md`.
+
 The outcome and cross-project result graph lives in `Doc/OUTCOME_GRAPH.md`.
 
 ### 0.2 First Principles
@@ -121,6 +124,7 @@ Repository ownership boundaries are tracked in `Doc/REPO_BOUNDARIES.md`.
 | FR-LAB-01 | Lab feature toggles | Keep experimental interactions available without making them default workflow dependencies. | Should | Planned |
 | FR-SYNC-01 | Background sync | Run Google Calendar and GitHub sync in the background with cache-first UI, visible last-sync state, and manual fallback. | Should | Planned |
 | FR-CLOSE-01 | Daily closing loop | Use morning preview and evening review to convert open work into Done, Deferred, Cancelled, or Learned outcomes. | Must | Built, needs strengthening |
+| FR-CLOSE-02 | Project close summary | Capture closing decision, outcome, evidence, lesson, reusable asset, impact signal, and linked open project before a project is treated as meaningfully closed. | Must | Planned |
 | FR-WBS-01 | WBS closing map | Show project structure, sequence, time, blockers, and unfinished work so the user can close projects deliberately. | Must | Built, needs strengthening |
 | FR-OUTCOME-01 | Project outcome graph | Capture closed project outcomes, evidence, impact signals, reusable assets, lessons, and links to open projects. | Should | Planned |
 | FR-RND-01 | Local semantic search experiment | Validate local embeddings/search before productizing. | Should | Draft |
@@ -139,6 +143,7 @@ Repository ownership boundaries are tracked in `Doc/REPO_BOUNDARIES.md`.
 | BR-LAB-01 | A feature is experimental or interaction-unsafe | Keep it behind a lab toggle until escape paths and core actions are verified. | FR-LAB-01 |
 | BR-SYNC-01 | Background sync fails | Preserve cached data, show last failure state, and keep manual refresh available. | FR-SYNC-01 |
 | BR-CLOSE-01 | A project or item remains open after review | The system should ask whether it is Done, Deferred, Cancelled, blocked, or carried forward with a next closing action. | FR-CLOSE-01 |
+| BR-CLOSE-02 | A project is marked meaningfully done, learned, or cancelled | Prompt for a short close summary so the result, evidence, lesson, and reusable context are not lost. | FR-CLOSE-02 |
 | BR-WBS-01 | A project is shown in WBS | Show not only structure and dates, but the path to closure: incomplete work, blockers, sequence risk, and next action. | FR-WBS-01 |
 | BR-OUTCOME-01 | A project closes as Done, Cancelled, Deferred, or Learned | Capture the smallest useful outcome record: result, evidence, lesson or asset, and optional linked open project. | FR-OUTCOME-01 |
 | BR-OUTCOME-02 | A closed project result affects another project | Create a typed project link such as enables, reuses, depends_on, informs, supersedes, blocks, or contributes_to. | FR-OUTCOME-01 |
@@ -159,6 +164,7 @@ matter first.
 | SDG-DEC-006 | Decision | MissionC should move toward automatic background sync with visible cache/failure/manual-refresh state. | FP-8, F-4 | owner decision | Active |
 | SDG-DEC-007 | Decision | MissionC is a project closing system, not a project viewing dashboard. Morning/evening review and WBS are core closing mechanisms. | FP-9, F-8 | owner decision | Active |
 | SDG-DEC-008 | Decision | Closed projects should produce outcome nodes that can connect to open projects, reusable assets, lessons, impact signals, and future accounting edges. | FP-10, F-9 | `Doc/OUTCOME_GRAPH.md` | Active |
+| SDG-DEC-009 | Decision | Work state and closing decision should remain separate: operational status says where work is, while review decisions explain what was learned or closed. | FP-9, FP-10, F-8, F-9 | `Doc/CLOSING_OUTCOME_MODEL.md` | Active |
 
 ## 5. Operations Catalog
 
@@ -186,6 +192,7 @@ matter first.
 | FR-LAB-01 | settings UI, radial palette include, feature flags | Manual |
 | FR-SYNC-01 | scheduler lifecycle, integrations, diagnostics, settings copy | Manual |
 | FR-CLOSE-01 | review router, morning/evening templates, incomplete reasons, carry-over flow | Manual |
+| FR-CLOSE-02 | project detail, evening review, close summary fields, outcome capture | Manual |
 | FR-WBS-01 | WBS router/template, project stages, item links, blocker/review data | Manual |
 | FR-OUTCOME-01 | future outcome records, project links, project detail, WBS overlays | Manual |
 | FR-RND-* | RnD experiment reports | Manual |
@@ -201,6 +208,7 @@ matter first.
 | 2026-05-28 | CHG-PHIL-001 | Class B | Added MissionC product philosophy, organization terminology, lab feature direction, and background sync direction. |
 | 2026-05-28 | CHG-CLOSE-001 | Class B | Reframed MissionC around project closing, morning/evening reflection, and WBS as a closing map. |
 | 2026-05-28 | CHG-OUTCOME-001 | Class B | Added outcome graph model for closed project results, reusable assets, lessons, impact, and cross-project links. |
+| 2026-05-28 | CHG-CLOSE-002 | Class B | Added closing outcome model and project close summary minimum fields. |
 
 ## 8. Open Questions
 
@@ -213,6 +221,7 @@ matter first.
 | OQ-SDG-01 | Which semantic decisions deserve first-class issue templates versus simple markdown rows? | Medium | Open |
 | OQ-CLOSE-01 | What closing outcomes should be first-class in the UI: Done, Deferred, Cancelled, Learned, Blocked, or Carry-over? | High | Open |
 | OQ-CLOSE-02 | Should WBS include blocker/review overlays in V1, or first strengthen schedule/task sequence only? | High | Open |
+| OQ-CLOSE-03 | Should blocked be kept as a non-closing review decision rather than a project closing outcome? | High | Proposed: non-closing |
 | OQ-OUTCOME-01 | Should outcomes be captured only at project close, or also at milestone/stage completion? | High | Open |
 | OQ-OUTCOME-02 | Which impact vocabulary should be first: time saved, cost avoided, quality improved, revenue enabled, risk reduced, or trust increased? | Medium | Open |
 | OQ-OUTCOME-03 | Should project-to-project links be manual first, or suggested later by search/AI? | Medium | Open |

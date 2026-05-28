@@ -99,6 +99,9 @@ project/task timelines, but there is no strong feedback edge from review
 outcomes into WBS/project closure. There is also no outcome graph that lets a
 closed project feed another open project.
 
+The closing decision and close summary model that addresses this gap lives in
+`Doc/CLOSING_OUTCOME_MODEL.md`.
+
 ## 3. Closing State Graph
 
 ```mermaid
@@ -216,11 +219,12 @@ flowchart LR
 Suggested first implementation slice:
 
 1. Define first-class closing outcomes in docs and UI copy.
-2. Add WBS page smoke test.
-3. Add a project-level "next closing action" concept.
-4. Let evening review write decisions that can be surfaced in project/WBS views.
-5. Rename or reframe passive labels/screens so they point toward closure.
-6. Add an outcome graph later so closed projects can inform open projects.
+2. Add a project close summary path for done, learned, and cancelled work.
+3. Add WBS page smoke test.
+4. Add a project-level "next closing action" concept.
+5. Let evening review write decisions that can be surfaced in project/WBS views.
+6. Rename or reframe passive labels/screens so they point toward closure.
+7. Add an outcome graph later so closed projects can inform open projects.
 
 ## 8. Questions For Owner
 

@@ -26,6 +26,7 @@ truth table:
 | Recurring item completion | FR-CORE-01, F-1 | `items.recurrence_rule`, `items.recurrence_parent_id`, `items.source` | `src/core_api/routers/items.py`, `migrate.py` | recurrence regression test | Built |
 | Daily flow | FR-CORE-01, F-2 | `items`, `labels`, `item_labels`, `item_projects` | `src/core_api/routers/flow.py`, `index.html`, `flow_list.html` | page smoke tests | Built |
 | Morning/evening closing review | FR-CLOSE-01, FP-9, F-8 | `items`, `incomplete_reasons`, `review_memos` | `src/core_api/routers/review.py`, `morning.html`, `evening.html` | page smoke tests, review route exists | Built, needs closing semantics |
+| Project close summary | FR-CLOSE-02, SDG-DEC-009, FP-9, FP-10 | future close summary fields, future `project_outcomes` | future project detail and evening review flow | `Doc/CLOSING_OUTCOME_MODEL.md` | Planned |
 | Calendar | FR-CAL-01, FR-CAL-02 | `items`, `gcal_cache`, `projects`, `businesses`, `organizations` | `src/core_api/routers/calendar.py`, `calendar.html` | calendar page smoke, org/project form smoke | Built, needs UX review |
 | Organization/business/project hierarchy | FR-ORG-01, FP-3 | `organizations`, `businesses`, `projects`, `project_stages` | `src/core_api/routers/hierarchy.py`, `hierarchy.html`, `project.html` | hierarchy page smoke, FK tests | Built, needs copy/data polish |
 | WBS closing map | FR-WBS-01, FR-ORG-01, FP-9, F-8 | `projects`, `project_stages`, `items`, `item_projects`, future blocker/review overlays | `src/core_api/routers/wbs.py`, `wbs.html` | page smoke missing | Built, needs closing semantics and tests |
@@ -41,7 +42,7 @@ truth table:
 | AI suggestion | FR-RND-03, F-5 | `items`, `tags`, `projects` | `src/core_api/routers/ai_suggest.py` | test gap | Lightweight heuristic |
 | Radial command palette | SDG-DEC-003, FR-LAB-01, F-7 | command state in browser, future lab toggle setting | `radial.js`, `radial.css`, `radial_palette.html` | GitHub issue #1 | Lab feature planned |
 | Background sync | SDG-DEC-006, FR-SYNC-01, F-4 | `settings`, `gcal_cache`, `github_cache`, future sync state/cursor | `src/core_api/main.py`, `src/core_api/integrations.py`, diagnostics/settings UI | design pending | Planned |
-| Outcome graph | SDG-DEC-008, FR-OUTCOME-01, FP-10, F-9 | future `project_outcomes`, `outcome_evidence`, `outcome_impacts`, `project_links` | future project close flow, project detail, WBS overlays | `Doc/OUTCOME_GRAPH.md` | Planned |
+| Outcome graph | SDG-DEC-008, FR-OUTCOME-01, FP-10, F-9 | future `project_outcomes`, `outcome_evidence`, `outcome_impacts`, `project_links` | future project close flow, project detail, WBS overlays | `Doc/OUTCOME_GRAPH.md`, `Doc/CLOSING_OUTCOME_MODEL.md` | Planned |
 
 ## Data Connection Map
 
@@ -55,6 +56,7 @@ truth table:
 | Operations | `notification_events`, `retry_queue`, `settings` | `diagnostics.py`, `notifications.py`, `setup.py` | alerts, retry visibility, setup, health |
 | Review | `incomplete_reasons`, `review_memos` | `review.py` | morning/evening review |
 | Closing loop | `items.status`, `items.due_date`, `incomplete_reasons`, `review_memos`, `project_stages`, `item_projects` | `review.py`, `wbs.py`, `items.py`, `flow.py` | daily closing, carry-over, blockers, WBS completion path |
+| Close summary | future close summary fields and outcome seed records | future project detail, evening review | closing decision, outcome summary, evidence, lesson, next action |
 | Outcome graph | future `project_outcomes`, `outcome_evidence`, `outcome_impacts`, `project_links` | future close summary, WBS, project detail | closed project results, reusable assets, lessons, cross-project links |
 | Files | `file_index`, local notes folders | `hierarchy.py`, `integrations.py` | folder open, project folder creation |
 
@@ -79,7 +81,7 @@ truth table:
 | HOLE-005 | Telegram offset | `_tg_offset` is in memory, so restart can duplicate messages. | Should we persist it in `settings`, or create a dedicated integration cursor table? |
 | HOLE-006 | Tests | Current tests cover core flows but not several newer routers. | Deferred: first refine philosophy and concept model before choosing test priority. |
 | HOLE-007 | RnD AI | AI search/voice/tagging are partially represented but not product-grade. | Should these remain explicitly RnD, or should one be promoted into the next product cycle? |
-| HOLE-008 | Closing model | Morning/evening review and WBS exist, but they are not yet unified as a project closing system. | Define first-class closing outcomes and connect review results to WBS/project progress. |
+| HOLE-008 | Closing model | Morning/evening review and WBS exist, but they are not yet unified as a project closing system. | First design pass complete in `Doc/CLOSING_OUTCOME_MODEL.md`; next step is close summary UI/data implementation. |
 | HOLE-009 | Outcome continuity | Closed projects do not yet leave reusable outcome nodes or typed links to open projects. | Start with a lightweight close summary before adding tables or accounting integration. |
 
 ## Maintenance Rule

@@ -8,6 +8,9 @@ This document extends the closing philosophy:
 > Close work, preserve its result, and connect that result to the next useful
 > project.
 
+The concrete closing decision and project close summary model is defined in
+`Doc/CLOSING_OUTCOME_MODEL.md`.
+
 Accounting integration is intentionally out of scope for now. However, the
 model should be compatible with future accounting or performance systems by
 separating outcomes, value evidence, cost evidence, and project links.
@@ -220,7 +223,7 @@ Do not build accounting. Do not build a graph database.
 
 First useful slice:
 
-1. Add a closing summary section to project close/review docs.
+1. Implement the close summary model from `Doc/CLOSING_OUTCOME_MODEL.md`.
 2. Define outcome types and project link types in Master Spec.
 3. Let closed projects record one outcome and one evidence reference.
 4. Let an open project link to a closed project's outcome as `reuses`,
