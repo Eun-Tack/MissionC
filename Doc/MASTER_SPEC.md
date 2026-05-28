@@ -37,6 +37,9 @@ real use, but pivots should be explicit, traceable, and grounded in evidence.
 The expanded philosophy and concept definitions live in
 `Doc/PRODUCT_PHILOSOPHY.md`.
 
+The current closing-loop graph review and cleanup candidates live in
+`Doc/CLOSING_GRAPH_REVIEW.md`.
+
 ### 0.2 First Principles
 
 | FP-ID | Principle | Statement | Source |
