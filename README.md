@@ -22,6 +22,9 @@ This project treats software as a flexible craft:
 - Product concepts may evolve through actual use, but every pivot should leave
   evidence.
 
+The fuller philosophy and concept model are documented in
+[Doc/PRODUCT_PHILOSOPHY.md](Doc/PRODUCT_PHILOSOPHY.md).
+
 ## AI_SDLC Alignment
 
 MissionC is managed with the AI_SDLC framework located at:
@@ -95,6 +98,7 @@ MissionC/
 ## Core Documents
 
 - [Doc/MASTER_SPEC.md](Doc/MASTER_SPEC.md)
+- [Doc/PRODUCT_PHILOSOPHY.md](Doc/PRODUCT_PHILOSOPHY.md)
 - [Doc/IMPLEMENTATION_LEDGER.md](Doc/IMPLEMENTATION_LEDGER.md)
 - [Doc/REPO_BOUNDARIES.md](Doc/REPO_BOUNDARIES.md)
 - [Doc/CLAUDE.md](Doc/CLAUDE.md)

@@ -37,6 +37,9 @@ Every feature should be connected to product essence, first principles, quality
 factors, requirements, or operational evidence. MissionC is craft, not a pile of
 detached features.
 
+For expanded product philosophy and terminology, read
+`Doc/PRODUCT_PHILOSOPHY.md`.
+
 ## Agent Operating Rules
 
 - Read `Doc/MASTER_SPEC.md` before making product-level changes.
@@ -47,7 +50,12 @@ detached features.
 - For Class B/C/D changes, update docs and tests together with code.
 - For changes that affect product meaning, quality factors, or major user flows,
   add or update a Semantic-Dev-Graph decision entry.
-- Keep command palette work isolated until close/keyboard behavior is stable.
+- Keep command palette work behind a lab feature toggle until close/keyboard
+  behavior is stable.
+- Use Organization/조직 as the current product term for the top-level
+  affiliation concept. Treat older `소속` wording as historical evidence.
+- Background sync is a desired direction, but it must expose cache, last-sync,
+  failure, and manual-refresh state.
 - Treat `MC` as a compatibility shorthand and `MissionC` as the product name.
 
 ## AI_SDLC Phase Paths
@@ -120,9 +128,10 @@ Minimum fields:
 
 | Item | Reason |
 |------|--------|
-| Command palette | Keyboard close and feature behavior were unstable; keep disabled or isolated until fixed. |
+| Command palette | Keyboard close and feature behavior were unstable; keep behind lab toggle until fixed. |
 | Google Calendar auth | OAuth and local credential handling must remain consistent and diagnosable. |
 | Organization/project linkage | Schedules and items should carry organization, business, and project context. |
+| Background sync | GCal/GitHub should move toward background refresh with honest visible state. |
 | Telegram offset | Must be persisted before Telegram polling becomes active. |
 | AI RnD | Local AI features need measurable experiments before product workflows. |
 

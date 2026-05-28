@@ -23,8 +23,8 @@ identity is MissionC.
 ### 0.1 Philosophy
 
 MissionC is a local-first mission control system for a single knowledge worker.
-It exists to prevent schedules, notes, projects, decisions, and integration
-signals from becoming scattered fragments.
+It exists to keep schedules, notes, projects, decisions, and integration
+signals connected to the meaning behind the work.
 
 The guiding belief is simple: a system should not contain meaningless
 structure. Every visible feature, hidden rule, document, and automation path
@@ -32,6 +32,9 @@ must be connected to a clear intention.
 
 MissionC treats software as flexible craft. Its concepts may evolve through
 real use, but pivots should be explicit, traceable, and grounded in evidence.
+
+The expanded philosophy and concept definitions live in
+`Doc/PRODUCT_PHILOSOPHY.md`.
 
 ### 0.2 First Principles
 
@@ -43,6 +46,8 @@ real use, but pivots should be explicit, traceable, and grounded in evidence.
 | FP-4 | Honest automation | Sync, cache, credential, and diagnostic states must be visible rather than silently failing. | Review Summary |
 | FP-5 | RnD before AI promise | AI/NPU features must pass measurable local experiments before becoming product workflows. | RnD track |
 | FP-6 | Meaningful structure | Product concepts, data models, and UI surfaces should carry intentional meaning, not decorative labels. | Owner interview |
+| FP-7 | Lab before default | Experimental interactions may exist, but they must be explicitly marked as lab features until safe. | Owner decision |
+| FP-8 | Background without opacity | Background sync is desirable only when cache state, failures, and manual recovery are visible. | Owner decision |
 
 ### 0.3 Quality Factors
 
@@ -54,6 +59,7 @@ real use, but pivots should be explicit, traceable, and grounded in evidence.
 | F-4 | Operational Honesty | Sync, cache, DB, and credential states should be explainable from the UI or logs. | stale sync count, diagnostic coverage |
 | F-5 | RnD Measurability | AI features need datasets, pass criteria, failure criteria, and rollback paths. | experiment pass rate, rollback rate |
 | F-6 | Semantic Coherence | Product meaning, requirements, implementation, and Git evidence should remain connected. | semantic decision coverage |
+| F-7 | Interaction Safety | Experimental UI must not trap the user or block core workflows. | stuck overlay incidents, escape-path coverage |
 
 ## 1. Project Overview
 
@@ -83,6 +89,8 @@ Repository ownership boundaries are tracked in `Doc/REPO_BOUNDARIES.md`.
 | In | Google Calendar readonly sync and credential setup. | Built, needs UX hardening |
 | In | GitHub issue cache and integration status. | Built, needs rate-limit handling |
 | In | Telegram capture. | Built, needs offset persistence before active use |
+| In | Lab feature toggle model for experimental interactions. | Planned |
+| In | Background sync model for GCal/GitHub with visible state. | Planned |
 | In | Semantic-Dev-Graph documentation and decision tracing. | Started |
 | Out | Multi-user SaaS, mobile app, remote-first AI processing. | Future |
 
@@ -94,9 +102,11 @@ Repository ownership boundaries are tracked in `Doc/REPO_BOUNDARIES.md`.
 | FR-CAP-01 | Unified capture inbox | Triage quick, Telegram, and future voice inputs without losing data. | Must | Built |
 | FR-CAL-01 | Local calendar view | Show local and cached Google Calendar events together. | Must | Built |
 | FR-CAL-02 | Google Calendar OAuth sync | Import primary calendar data through Google OAuth. | Must | Built |
-| FR-ORG-01 | Organization and project linkage | Let schedules/items connect to organization, business, and project context. | Must | Built, needs polish |
+| FR-ORG-01 | Organization and project linkage | Let schedules/items connect to organization, business, and project context. "Organization" is the current product term for the previously ambiguous "sosok" concept. | Must | Built, needs copy/data polish |
 | FR-INT-01 | Integration health and credentials | Let the user test and understand credential state. | Must | Built |
 | FR-OPS-01 | Diagnostics and retry visibility | Surface DB, cache, worker, credential, and sync state. | Must | Built |
+| FR-LAB-01 | Lab feature toggles | Keep experimental interactions available without making them default workflow dependencies. | Should | Planned |
+| FR-SYNC-01 | Background sync | Run Google Calendar and GitHub sync in the background with cache-first UI, visible last-sync state, and manual fallback. | Should | Planned |
 | FR-RND-01 | Local semantic search experiment | Validate local embeddings/search before productizing. | Should | Draft |
 | FR-RND-02 | Local voice capture experiment | Validate local STT accuracy and latency. | Should | Draft |
 | FR-RND-03 | AI tag suggestion experiment | Validate whether local AI reduces manual classification cost. | Could | Draft |
@@ -110,6 +120,8 @@ Repository ownership boundaries are tracked in `Doc/REPO_BOUNDARIES.md`.
 | BR-CAL-01 | Google Calendar API fails | Show cached data where possible and record the failure state. | FR-CAL-02 |
 | BR-RND-01 | An AI experiment fails pass criteria | Keep the manual/local workflow as the default path. | FR-RND-* |
 | BR-SDG-01 | A feature changes product meaning or quality factors | Add or update a Semantic-Dev-Graph decision entry. | FR-OPS-01 |
+| BR-LAB-01 | A feature is experimental or interaction-unsafe | Keep it behind a lab toggle until escape paths and core actions are verified. | FR-LAB-01 |
+| BR-SYNC-01 | Background sync fails | Preserve cached data, show last failure state, and keep manual refresh available. | FR-SYNC-01 |
 
 ## 4. Semantic-Dev-Graph Seed
 
@@ -121,8 +133,10 @@ matter first.
 |--------|------|-----------|-------------|----------|--------|
 | SDG-DEC-001 | Decision | MissionC remains local-first and single-operator before team/SaaS expansion. | FP-1, FP-2, F-3 | `Doc/MASTER_SPEC.md` | Active |
 | SDG-DEC-002 | Decision | Product name becomes MissionC; `MC` remains only as compatibility shorthand. | FP-6, F-6 | `README.md`, `Doc/CLAUDE.md` | Active |
-| SDG-DEC-003 | Decision | Palette UX issues are treated as a separate interaction-quality track before reactivation. | F-2, F-4 | GitHub issue backlog | Proposed |
+| SDG-DEC-003 | Decision | Palette remains available only as a lab feature until close/keyboard/action safety is proven. | FP-7, F-7 | GitHub issue #1 | Active |
 | SDG-DEC-004 | Decision | AI features stay in RnD until measurable local experiments pass. | FP-5, F-5 | RnD docs and tests | Active |
+| SDG-DEC-005 | Decision | "Sosok" means Organization; new product copy should use Organization/조직 instead of 소속. | FP-6, F-6 | `Doc/PRODUCT_PHILOSOPHY.md` | Active |
+| SDG-DEC-006 | Decision | MissionC should move toward automatic background sync with visible cache/failure/manual-refresh state. | FP-8, F-4 | owner decision | Active |
 
 ## 5. Operations Catalog
 
@@ -147,6 +161,8 @@ matter first.
 | FP-1, F-3 | `src/core_api/auth.py`, `.gitignore`, credential setup docs | Watch |
 | F-2 | hierarchy, search, calendar, command palette UX | Manual |
 | FR-ORG-01 | item/calendar forms and project/business selectors | Manual |
+| FR-LAB-01 | settings UI, radial palette include, feature flags | Manual |
+| FR-SYNC-01 | scheduler lifecycle, integrations, diagnostics, settings copy | Manual |
 | FR-RND-* | RnD experiment reports | Manual |
 | BR-SDG-01 | semantic decision templates and PR review checklist | Manual |
 
@@ -157,6 +173,7 @@ matter first.
 | 2026-05-27 | CHG-MASTER-001 | Class B | Added AI_SDLC master specification for MC. |
 | 2026-05-27 | CHG-RND-001 | Class B | Added local AI/search/voice/tag/sync hardening RnD track. |
 | 2026-05-28 | CHG-MISSIONC-001 | Class B | Reframed MC as MissionC and aligned docs to AI_SDLC v2.1.1. |
+| 2026-05-28 | CHG-PHIL-001 | Class B | Added MissionC product philosophy, organization terminology, lab feature direction, and background sync direction. |
 
 ## 8. Open Questions
 
@@ -164,6 +181,6 @@ matter first.
 |-------|----------|--------|--------|
 | OQ-RND-01 | What real notes/items should become the semantic search gold set? | High | Open |
 | OQ-RND-02 | What WER and latency thresholds make voice capture useful enough? | Medium | Open |
-| OQ-RND-03 | When should Google/GitHub sync move from on-demand to background scheduling? | Medium | Open |
+| OQ-RND-03 | How should Google/GitHub background sync be scheduled and surfaced without blocking pages? | Medium | Decided direction, design open |
 | OQ-RND-04 | What exact persistence key/table should Telegram polling offset use? | High before Telegram launch | Open |
 | OQ-SDG-01 | Which semantic decisions deserve first-class issue templates versus simple markdown rows? | Medium | Open |

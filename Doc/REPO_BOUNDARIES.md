@@ -25,6 +25,7 @@ Recommended roles:
 | Document | Role |
 |----------|------|
 | `Doc/MASTER_SPEC.md` | Single source of product meaning and current specification. |
+| `Doc/PRODUCT_PHILOSOPHY.md` | MissionC philosophy, concept model, terminology, and product judgment rules. |
 | `Doc/IMPLEMENTATION_LEDGER.md` | Current implementation-to-data-to-test bridge. |
 | `Doc/REPO_BOUNDARIES.md` | Repository ownership and separation rules. |
 | `Doc/phase0_research/` | Research evidence. |
@@ -81,7 +82,7 @@ These are not deletions to perform blindly. They are candidates to review:
 |-----------|--------|-----------------|
 | `project_hub.py` | Appears to be an older Local Project Hub implementation. | Mark legacy or move to `archive/` after confirming it is unused. |
 | Root `static/` | May belong to the older app while current app uses `src/core_api/static/`. | Compare references before removing or archiving. |
-| Radial palette files | Implemented but currently unstable. | Keep in code, disable globally, and track via issue #1. |
+| Radial palette files | Implemented but currently unstable. | Keep as lab feature, gate behind a toggle, and track via issue #1. |
 | Old phase docs with v1/v1.5 language | Useful history but can confuse current status. | Keep as historical evidence; use Master Spec and Ledger as current truth. |
 
 ## Naming Rule
@@ -99,3 +100,16 @@ Keep `MC` only where changing it would create compatibility cost:
 - existing DB file names,
 - legacy comments or migration history,
 - old phase evidence.
+
+## Terminology Rule
+
+Current product language should use:
+
+| Preferred Term | Meaning | Avoid as Primary New Copy |
+|----------------|---------|---------------------------|
+| Organization / 조직 | Top-level affiliation context | 소속 |
+| Business / 사업 | Program or workstream under an organization | - |
+| Project / 프로젝트 | Outcome-oriented unit of work | - |
+
+Historical phase documents may keep the older term `소속`, but new copy should
+prefer `조직` to reduce ambiguity.
