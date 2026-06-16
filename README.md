@@ -70,8 +70,14 @@ Clone the repository, then run:
 start-local.cmd
 ```
 
-The script creates `.venv`, installs dependencies, copies `.env.example` to
-`.env` if needed, initializes the SQLite database, and starts the local server.
+The script checks for Python 3.11+, tries to install Python 3.12 with `winget`
+if Python is missing, creates `.venv`, installs dependencies, copies
+`.env.example` to `.env` if needed, initializes the SQLite database, and starts
+the local server.
+
+Automatic Python installation requires Windows `winget` and an internet
+connection. If Windows asks for installation confirmation, approve it and run
+`start-local.cmd` again if needed.
 
 Then open:
 
