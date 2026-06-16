@@ -43,6 +43,11 @@
           {% for label in item.labels %}
           <span class="label" data-type="{{ label.name }}">{{ label.name }}</span>
           {% endfor %}
+          {% if item.due_time_display %}
+          <span class="label" data-type="deadline">마감 {{ item.due_time_display }}</span>
+          {% elif item.due_date %}
+          <span class="label" data-type="deadline">마감 {{ item.due_date[5:] }}</span>
+          {% endif %}
           {# Tags #}
           {% for tag in item.tags %}
           <span class="tag-chip">#{{ tag }}</span>
@@ -53,6 +58,7 @@
       <div style="display:flex; gap:2px; opacity:0; transition: opacity 120ms;" class="row-actions">
         {% if item.status != 'done' %}
         <button class="status-btn"
+                data-row-action
                 hx-patch="/api/items/{{ item.id }}"
                 hx-vals='{"status": "done"}'
                 hx-target="#dot-{{ item.id }}"
@@ -61,6 +67,7 @@
         {% endif %}
         {% if item.status == 'todo' %}
         <button class="status-btn"
+                data-row-action
                 hx-patch="/api/items/{{ item.id }}"
                 hx-vals='{"status": "doing"}'
                 hx-target="#dot-{{ item.id }}"

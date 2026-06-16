@@ -115,6 +115,45 @@
     padding: 5px 10px; background: var(--brand-soft); color: var(--brand);
     border: none; border-radius: 6px; font-size: 11px; cursor: pointer; font-weight: 500;
   }
+  .ctx-meta-command {
+    display: flex; gap: 6px; margin-top: 10px; align-items: center;
+  }
+  .ctx-meta-command input {
+    flex: 1; padding: 7px 10px; border: 1px solid var(--border);
+    border-radius: 8px; background: var(--bg); color: var(--fg);
+    font-size: 12px; font-family: inherit;
+  }
+  .ctx-meta-command button,
+  .ctx-folder-btn {
+    padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--surface); color: var(--fg); font-size: 12px;
+    cursor: pointer; font-family: inherit; white-space: nowrap;
+  }
+  .ctx-meta-command button:hover,
+  .ctx-folder-btn:hover { border-color: var(--brand); color: var(--brand); }
+  .kg-help { font-size: 11px; color: var(--muted); line-height: 1.45; background: var(--surface-2); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; }
+  .kg-form { display: grid; grid-template-columns: 92px 1fr; gap: 6px; }
+  .kg-form select, .kg-form input { min-width: 0; padding: 7px 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--fg); font-size: 12px; font-family: inherit; }
+  .kg-form .wide { grid-column: 1 / -1; }
+  .kg-form button { grid-column: 1 / -1; padding: 8px; border: none; border-radius: 8px; background: var(--brand-soft); color: var(--brand); font-size: 12px; font-weight: 700; cursor: pointer; }
+  .kg-browser { grid-column: 1 / -1; display: grid; gap: 6px; }
+  .kg-target-preview { grid-column: 1 / -1; padding: 7px 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); color: var(--muted); font-size: 11px; line-height: 1.4; }
+  .kg-target-preview.ready { color: var(--brand); border-color: var(--brand); background: var(--brand-soft); font-weight: 700; }
+  .kg-form [id^="kg-kind-"] { display: none !important; }
+  .kg-form [id^="kg-scope-"], .kg-form [id^="kg-query-"], .kg-form [id^="kg-suggest-"] { display: none !important; }
+  .kg-suggest { grid-column: 1 / -1; max-height: 150px; overflow-y: auto; display: none; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+  .kg-suggest.open { display: block; }
+  .kg-opt { padding: 7px 9px; cursor: pointer; font-size: 12px; border-bottom: 1px solid var(--border); }
+  .kg-opt:last-child { border-bottom: 0; }
+  .kg-opt:hover { background: var(--brand-soft); color: var(--brand); }
+  .kg-opt small { color: var(--muted); display: block; margin-top: 2px; }
+  .kg-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+  .kg-row { border: 1px solid var(--border); border-radius: 8px; padding: 8px; background: var(--bg); }
+  .kg-title { display: flex; gap: 6px; align-items: center; text-decoration: none; color: var(--fg); font-size: 12px; font-weight: 700; }
+  .kg-type, .kg-rel { font-size: 10px; padding: 1px 6px; border-radius: 999px; background: var(--surface-2); color: var(--muted); }
+  .kg-rel { float: right; margin-top: -18px; }
+  .kg-reason, .kg-empty { color: var(--muted); font-size: 11px; margin-top: 5px; }
+  .kg-del { float: right; border: none; background: transparent; color: var(--muted); cursor: pointer; }
 
   /* ── Status segmented control ───────────────────────────────── */
   .ctx-status-seg {
@@ -132,6 +171,22 @@
   .ctx-status-btn.active.doing   { background: oklch(94% 0.06 240); color: oklch(35% 0.18 240); }
   .ctx-status-btn.active.done    { background: oklch(94% 0.06 145); color: oklch(35% 0.16 145); }
   .ctx-status-btn.active.waiting { background: oklch(96% 0.07 80);  color: oklch(35% 0.16 80); }
+
+  .ctx-action-bar {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px; padding: 14px 20px 18px; border-top: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .ctx-action-btn {
+    min-height: 34px; padding: 7px 8px; border: 1px solid var(--border);
+    border-radius: 8px; background: var(--bg); color: var(--fg);
+    font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit;
+  }
+  .ctx-action-btn:hover { border-color: var(--brand); color: var(--brand); }
+  .ctx-action-btn.primary { background: var(--brand); border-color: var(--brand); color: white; }
+  .ctx-action-btn.primary:hover { filter: brightness(0.95); color: white; }
+  .ctx-action-btn.danger { color: oklch(48% 0.2 25); }
+  .ctx-action-btn.danger:hover { border-color: oklch(65% 0.18 25); background: oklch(97% 0.02 25); }
 
   /* ── Sub-tasks (hierarchical) ──────────────────────────────── */
   .sub-progress-row {
@@ -168,7 +223,23 @@
   .sub-x:hover { opacity: 1 !important; color: oklch(60% 0.21 25); }
   .sub-title { flex: 1; }
   .sub-meta { font-size: 10px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
-  .sub-add-row { display: flex; gap: 4px; margin-top: 8px; }
+  .sub-item-detail { align-items: flex-start; }
+  .sub-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+  .sub-title-input {
+    width: 100%; border: 1px solid transparent; border-radius: 6px;
+    background: transparent; color: var(--fg); font-size: 12px;
+    padding: 3px 5px; font-family: inherit;
+  }
+  .sub-title-input:focus { outline: none; border-color: var(--brand); background: var(--bg); }
+  .sub-done .sub-title-input { text-decoration: line-through; color: var(--muted); }
+  .sub-controls { display: grid; grid-template-columns: 76px 1fr 1fr 1.35fr; gap: 4px; }
+  .sub-controls input,
+  .sub-controls select {
+    min-width: 0; padding: 4px 5px; border: 1px solid var(--border);
+    border-radius: 6px; background: var(--surface); color: var(--fg);
+    font-size: 10px; font-family: inherit;
+  }
+  .sub-add-row { display: none; gap: 4px; margin-top: 8px; }
   .sub-add-row input[type=text] {
     flex: 1; padding: 5px 9px; border: 1px solid var(--border);
     border-radius: 6px; font-size: 12px; background: var(--surface); color: var(--fg);
@@ -181,6 +252,46 @@
   .sub-add-row button {
     padding: 5px 10px; background: var(--brand-soft); color: var(--brand);
     border: none; border-radius: 6px; font-size: 11px; cursor: pointer; font-weight: 500;
+  }
+  .sub-open-modal {
+    width: 100%; margin-top: 8px; padding: 8px 10px; border: 1px solid var(--brand);
+    border-radius: 8px; background: var(--brand-soft); color: var(--brand);
+    font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit;
+  }
+  .sub-modal-backdrop {
+    position: fixed; inset: 0; background: oklch(0% 0 0 / 0.24);
+    z-index: 160; display: none; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .sub-modal-backdrop.open { display: flex; }
+  .sub-modal {
+    width: min(520px, 100%); background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; box-shadow: 0 16px 50px oklch(0% 0 0 / 0.18);
+    overflow: hidden;
+  }
+  .sub-modal-h {
+    padding: 14px 16px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    font-weight: 700;
+  }
+  .sub-modal-close {
+    border: none; background: var(--surface-2); color: var(--muted);
+    border-radius: 50%; width: 28px; height: 28px; cursor: pointer;
+  }
+  .sub-modal-body { padding: 16px; display: flex; flex-direction: column; gap: 10px; max-height: 76vh; overflow-y: auto; }
+  .sub-modal-row { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 8px; }
+  .sub-modal-field { display: flex; flex-direction: column; gap: 4px; }
+  .sub-modal-field label { font-size: 10px; color: var(--muted); font-weight: 700; }
+  .sub-modal-field input,
+  .sub-modal-field textarea {
+    width: 100%; min-width: 0; box-sizing: border-box;
+    padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--bg); color: var(--fg); font-size: 13px; font-family: inherit;
+  }
+  .sub-modal-field textarea { min-height: 88px; resize: vertical; }
+  .sub-modal-submit {
+    padding: 10px; border: none; border-radius: 8px; background: var(--brand);
+    color: white; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit;
   }
 
   /* ── Recurrence picker ──────────────────────────────────── */
@@ -322,6 +433,65 @@
 
   <!-- ── STATUS SEGMENTED ───────────────────────────────────── -->
   <div class="ctx-section">
+    <div class="ctx-section-h">연관 연결</div>
+    <div class="kg-help">이유는 한 문장, 160자 이하로 남기세요. “왜 같이 봐야 하는가”만 적으면 그래프가 가벼워집니다.</div>
+    <form class="kg-form"
+          hx-post="/api/links"
+          hx-target="#kg-links-item-{{ item.id }}"
+          hx-swap="innerHTML"
+          hx-on::after-request="ctxClearLinkForm({{ item.id }})">
+      <input type="hidden" name="src_type" value="item">
+      <input type="hidden" name="src_id" value="{{ item.id }}">
+      <input type="hidden" name="dst_type" id="kg-dst-type-{{ item.id }}">
+      <input type="hidden" name="dst_id" id="kg-dst-id-{{ item.id }}">
+      <select id="kg-kind-{{ item.id }}" onchange="ctxBrowserKindChanged({{ item.id }})">
+        <option value="project">프로젝트</option>
+        <option value="item">할 일</option>
+      </select>
+      <select id="kg-org-{{ item.id }}" onchange="ctxBrowserOrgChanged({{ item.id }})">
+        <option value="">소속 선택</option>
+      </select>
+      <select id="kg-business-{{ item.id }}" onchange="ctxBrowserBusinessChanged({{ item.id }})">
+        <option value="">사업 선택</option>
+      </select>
+      <div class="kg-browser">
+        <select id="kg-project-{{ item.id }}" onchange="ctxBrowserProjectChanged({{ item.id }})">
+          <option value="">프로젝트 선택</option>
+        </select>
+        <select id="kg-item-{{ item.id }}" onchange="ctxBrowserItemChanged({{ item.id }})">
+          <option value="">할 일 선택</option>
+        </select>
+      </div>
+      <div class="kg-target-preview" id="kg-target-preview-{{ item.id }}">연결할 프로젝트 또는 할 일을 선택하세요.</div>
+      <select id="kg-scope-{{ item.id }}" onchange="ctxLinkSearch({{ item.id }})">
+        <option value="project">프로젝트</option>
+        <option value="task">할 일</option>
+        <option value="subtask">하위작업</option>
+        <option value="github">GitHub</option>
+        <option value="calendar">캘린더</option>
+        <option value="drive">Drive/파일</option>
+        <option value="all">전체</option>
+      </select>
+      <input id="kg-query-{{ item.id }}" placeholder="연결할 항목 검색..." autocomplete="off"
+             oninput="ctxLinkSearch({{ item.id }})">
+      <div class="kg-suggest" id="kg-suggest-{{ item.id }}"></div>
+      <select name="relation">
+        <option value="relates_to">관련</option>
+        <option value="depends_on">의존</option>
+        <option value="blocks">막음</option>
+        <option value="supports">지원</option>
+        <option value="duplicates">중복</option>
+      </select>
+      <input name="reason" class="wide" maxlength="160" placeholder="이유: 이 작업이 제안서 마감 판단에 필요함">
+      <button type="submit">연결 저장</button>
+    </form>
+    <div id="kg-links-item-{{ item.id }}"
+         hx-get="/api/links/item/{{ item.id }}"
+         hx-trigger="load"
+         hx-swap="innerHTML"></div>
+  </div>
+
+  <div class="ctx-section">
     <div class="ctx-section-h">상태</div>
     <div class="ctx-status-seg">
       {% for st, label in [('todo','대기'),('doing','진행'),('waiting','보류'),('done','완료')] %}
@@ -355,10 +525,19 @@
           hx-patch="/api/items/{{ item.id }}"
           hx-trigger="change from:input"
           hx-swap="none"
-          hx-on::after-request="ctxToast({{ item.id }})">
-      <input class="ctx-date-input" type="datetime-local" name="scheduled_at"
-             value="{{ (item.start_at or item.scheduled_at or '')[:16] }}"
-             id="date-{{ item.id }}">
+          hx-on::after-request="ctxAfterItemChanged({{ item.id }})">
+      <div style="flex:1; min-width:0;">
+        <label style="display:block; font-size:10px; color:var(--muted); font-weight:700; margin-bottom:4px;">시작</label>
+        <input class="ctx-date-input" type="datetime-local" name="scheduled_at"
+               value="{{ (item.start_at or item.scheduled_at or '')[:16] }}"
+               id="date-{{ item.id }}">
+      </div>
+      <div style="flex:1; min-width:0;">
+        <label style="display:block; font-size:10px; color:var(--muted); font-weight:700; margin-bottom:4px;">종료</label>
+        <input class="ctx-date-input" type="datetime-local" name="end_at"
+               value="{{ (item.end_at or '')[:16] }}"
+               id="end-date-{{ item.id }}">
+      </div>
     </form>
     <div class="ctx-quick-row">
       <button class="ctx-quick-btn" onclick="ctxQuickDate({{ item.id }}, 'today-9')">오늘 9시</button>
@@ -378,7 +557,7 @@
                hx-trigger="change"
                hx-include="this"
                hx-swap="none"
-               hx-on::after-request="ctxToast({{ item.id }})">
+               hx-on::after-request="ctxAfterItemChanged({{ item.id }})">
       </div>
       <div>
         <label>마감</label>
@@ -388,7 +567,7 @@
                hx-trigger="change"
                hx-include="this"
                hx-swap="none"
-               hx-on::after-request="ctxToast({{ item.id }})">
+               hx-on::after-request="ctxAfterItemChanged({{ item.id }})">
       </div>
     </div>
   </div>
@@ -402,11 +581,45 @@
          hx-swap="innerHTML">
       <div style="font-size:11px; color:var(--muted);">로딩 중...</div>
     </div>
+    <button type="button" class="sub-open-modal" onclick="ctxOpenSubtaskModal({{ item.id }})">+ 하위 작업 만들기</button>
+    <div class="sub-modal-backdrop" id="sub-modal-{{ item.id }}" onclick="if(event.target===this)ctxCloseSubtaskModal({{ item.id }})">
+      <form class="sub-modal"
+            hx-post="/api/items/{{ item.id }}/subtasks"
+            hx-target="#subtasks-{{ item.id }}"
+            hx-swap="innerHTML"
+            hx-on::after-request="this.reset();ctxCloseSubtaskModal({{ item.id }})">
+        <div class="sub-modal-h">
+          <span>하위 작업 생성</span>
+          <button type="button" class="sub-modal-close" onclick="ctxCloseSubtaskModal({{ item.id }})">×</button>
+        </div>
+        <div class="sub-modal-body">
+          <div class="sub-modal-field">
+            <label>하위 작업명</label>
+            <input type="text" name="title" placeholder="작업 이름..." autocomplete="off" required>
+          </div>
+          <div class="sub-modal-row">
+            <div class="sub-modal-field"><label>시작일</label><input type="date" name="start_date"></div>
+            <div class="sub-modal-field"><label>마감일</label><input type="date" name="due_date"></div>
+          </div>
+          <div class="sub-modal-row">
+            <div class="sub-modal-field"><label>마감 시간</label><input type="datetime-local" name="due_at"></div>
+            <div class="sub-modal-field"><label>담당자</label><input type="text" name="assignee_name" placeholder="이름"></div>
+          </div>
+          <div class="sub-modal-field">
+            <label>본문</label>
+            <textarea name="body" placeholder="세부 내용, 완료 기준, 참고사항..."></textarea>
+          </div>
+          <button type="submit" class="sub-modal-submit">생성</button>
+        </div>
+      </form>
+    </div>
     <form class="sub-add-row"
           hx-post="/api/items/{{ item.id }}/subtasks"
           hx-target="#subtasks-{{ item.id }}"
           hx-swap="innerHTML"
           hx-on::after-request="this.reset()">
+      <input type="date" name="start_date" title="시작일(선택)">
+      <input type="datetime-local" name="due_at" title="마감 시간(선택)">
       <input type="text" name="title" placeholder="새 하위 작업..." autocomplete="off" required>
       <input type="date" name="due_date" title="마감일 (선택)">
       <button type="submit">+ 추가</button>
@@ -445,7 +658,13 @@
       <form hx-post="/api/items/{{ item.id }}/project"
             hx-target="#proj-link-result-{{ item.id }}"
             hx-swap="innerHTML">
-        <select name="project_id" onchange="this.form.requestSubmit()">
+        <select id="proj-org-{{ item.id }}" onchange="ctxProjectOrgChanged({{ item.id }})">
+          <option value="">소속 선택</option>
+        </select>
+        <select id="proj-business-{{ item.id }}" onchange="ctxProjectBusinessChanged({{ item.id }})">
+          <option value="">사업 선택</option>
+        </select>
+        <select name="project_id" id="proj-project-{{ item.id }}" onchange="ctxSubmitProjectLink({{ item.id }})">
           <option value="">— 선택 —</option>
           {% for p in all_projects %}
           <option value="{{ p.id }}"
@@ -492,7 +711,18 @@
 
   <!-- ── LABELS ───────────────────────────────────────────── -->
   <div class="ctx-section">
-    <div class="ctx-section-h">🏷 라벨</div>
+    <div class="ctx-section-h">🏷 라벨 / 태그</div>
+    <div class="ctx-meta-command">
+      <input id="ctx-meta-input-{{ item.id }}"
+             placeholder="#태그, 라벨명 입력 · -#태그, -라벨명으로 제거"
+             autocomplete="off"
+             onkeydown="if(event.key==='Enter'){event.preventDefault();ctxApplyMetaCommand({{ item.id }})}">
+      <button type="button" onclick="ctxApplyMetaCommand({{ item.id }})">적용</button>
+    </div>
+  </div>
+
+  <div class="ctx-section">
+    <div class="ctx-section-h">라벨</div>
     <div id="labels-{{ item.id }}" class="ctx-pills">
       {% for label in labels %}
       <span class="ctx-pill" data-type="{{ label.name }}"
@@ -548,6 +778,20 @@
     <div class="ctx-section-h" style="display:flex; align-items:center; justify-content:space-between;">
       <span>📂 연결 파일</span>
     </div>
+    {% set root_path = project.folder_path if project and project.folder_path else (project.business_folder_path if project and project.business_folder_path else '') %}
+    {% if root_path %}
+    <button type="button" class="ctx-folder-btn"
+            data-path="{{ root_path|e }}"
+            onclick="ctxOpenFolder(this.dataset.path)">
+      프로젝트/사업 폴더 열기
+    </button>
+    <div style="font-size:11px; color:var(--muted); margin-top:6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
+         title="{{ root_path }}">{{ root_path }}</div>
+    {% else %}
+    <div style="font-size:11px; color:var(--muted); padding:4px 0;">
+      연결된 프로젝트 폴더가 없습니다. 설정에서 소속/사업/프로젝트 루트 경로를 먼저 지정하세요.
+    </div>
+    {% endif %}
     <div id="ctx-memos-{{ item.id }}">
     {% for memo in memos %}
     {% set fname = memo.path.split('\\')[-1].split('/')[-1] %}
@@ -584,7 +828,7 @@
       <button type="submit"
               style="padding:5px 10px; font-size:11px; font-weight:600; border:none;
                      border-radius:6px; background:var(--brand); color:white; cursor:pointer;">
-        + 연결
+        경로 저장
       </button>
     </form>
   </div>
@@ -612,21 +856,58 @@
 
   <!-- ── Danger zone ──────────────────────────────────────── -->
   <div class="ctx-section">
-    <button style="width:100%; padding:8px; background:transparent;
+    <div class="ctx-action-bar">
+      {% if item.status == 'done' %}
+      <button class="ctx-action-btn"
+              hx-patch="/api/items/{{ item.id }}"
+              hx-vals='{"status": "doing"}'
+              hx-swap="none"
+              hx-on::after-request="ctxAfterStatusAction({{ item.id }}, 'doing', '진행으로 변경')">
+        다시 진행
+      </button>
+      {% else %}
+      <button class="ctx-action-btn primary"
+              hx-patch="/api/items/{{ item.id }}"
+              hx-vals='{"status": "done"}'
+              hx-swap="none"
+              hx-on::after-request="ctxAfterStatusAction({{ item.id }}, 'done', '완료 처리')">
+        완료
+      </button>
+      {% endif %}
+      <button class="ctx-action-btn"
+              hx-patch="/api/items/{{ item.id }}"
+              hx-vals='{"status": "doing"}'
+              hx-swap="none"
+              hx-on::after-request="ctxAfterStatusAction({{ item.id }}, 'doing', '진행으로 변경')">
+        진행
+      </button>
+      <button class="ctx-action-btn" type="button" onclick="ctxFocusEdit({{ item.id }})">
+        수정
+      </button>
+      <button class="ctx-action-btn danger"
+              hx-delete="/api/items/{{ item.id }}"
+              hx-confirm="정말 삭제하시겠습니까?"
+              hx-swap="none"
+              hx-on::after-request="ctxAfterDelete({{ item.id }})">
+        삭제
+      </button>
+    </div>
+    <button style="display:none; width:100%; padding:8px; background:transparent;
                    border:1px solid var(--border); color:var(--muted);
                    border-radius:8px; font-size:12px; cursor:pointer;"
             hx-delete="/api/items/{{ item.id }}"
             hx-confirm="정말 삭제하시겠습니까?"
-            hx-target="#item-{{ item.id }}"
-            hx-swap="outerHTML">
+            hx-swap="none"
+            hx-on::after-request="ctxAfterDelete({{ item.id }})">
       ✕ 항목 삭제
     </button>
   </div>
 </div>
 
 <script>
+if (!window.ctxPanelSharedLoaded) {
 // ── Status change (no DOM target required) ───────────────────────
-function ctxOnStatusChange(id, status, btn) {
+window.ctxOnStatusChange = function(id, status, btn) {
   // Update button highlights
   btn.closest('.ctx-status-seg')?.querySelectorAll('.ctx-status-btn').forEach(b => {
     b.classList.toggle('active', b === btn);
@@ -643,7 +924,7 @@ function ctxOnStatusChange(id, status, btn) {
   const dot = document.getElementById('dot-' + id);
   if (dot) dot.innerHTML = `<span class="mc-dot" data-status="${status}"></span>`;
   ctxToast(id);
-}
+};
 
 // ── Simple markdown → HTML renderer ─────────────────────────────
 function _mdRender(text) {
@@ -671,7 +952,7 @@ function _mdRender(text) {
   return t;
 }
 
-function ctxRenderBody(id) {
+window.ctxRenderBody = function(id) {
   const el = document.getElementById('ctx-body-' + id);
   if (!el || el.tagName === 'TEXTAREA') return;
   const raw = el.dataset.raw || '';
@@ -682,7 +963,7 @@ function ctxRenderBody(id) {
     el.innerHTML = '';
     el.classList.add('empty');
   }
-}
+};
 
 // Auto-render on load
 (function() {
@@ -691,7 +972,7 @@ function ctxRenderBody(id) {
 })();
 
 // ── Inline title editing ──────────────────────────────────────────
-function ctxEditTitle(id) {
+window.ctxEditTitle = function(id) {
   const el = document.getElementById('ctx-title-' + id);
   if (!el || el.tagName === 'INPUT') return;
   const cur = el.textContent.trim();
@@ -713,17 +994,17 @@ function ctxEditTitle(id) {
     div.textContent = input.value;
     div.onclick = () => ctxEditTitle(id);
     input.replaceWith(div);
-    ctxToast(id);
+    ctxAfterItemChanged(id);
   };
   input.addEventListener('blur', save);
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
     if (e.key === 'Escape') { input.value = cur; input.blur(); }
   });
-}
+};
 
 // ── Inline body editing ───────────────────────────────────────────
-function ctxEditBody(id) {
+window.ctxEditBody = function(id) {
   const el = document.getElementById('ctx-body-' + id);
   if (!el || el.tagName === 'TEXTAREA') return;
   const cur = el.dataset.raw || '';
@@ -767,10 +1048,10 @@ function ctxEditBody(id) {
     if (e.key === 'Escape') { ta.value = cur; ta.blur(); }
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); ta.blur(); }
   });
-}
+};
 
 // ── Quick-date chips ──────────────────────────────────────────────
-async function ctxQuickDate(id, preset) {
+window.ctxQuickDate = async function(id, preset) {
   const now = new Date();
   let target = null;
   if (preset === 'today-9')   { target = new Date(now); target.setHours(9, 0, 0, 0); }
@@ -789,26 +1070,33 @@ async function ctxQuickDate(id, preset) {
   const fd = new FormData();
   fd.append('scheduled_at', value);
   await fetch('/api/items/' + id, {method: 'PATCH', body: fd});
-  ctxToast(id);
-}
+  ctxAfterItemChanged(id);
+};
 
 // ── Project picker reveal ────────────────────────────────────────
-function ctxToggleProjPick(id) {
-  document.getElementById('proj-pick-' + id)?.classList.toggle('open');
-}
+window.ctxToggleProjPick = function(id) {
+  const picker = document.getElementById('proj-pick-' + id);
+  picker?.classList.toggle('open');
+  if (picker?.classList.contains('open')) window.ctxInitProjectBrowser?.(id);
+};
 
 // ── In-panel toast ───────────────────────────────────────────────
-function ctxToast(id, msg) {
+window.ctxToast = function(id, msg) {
   const t = document.getElementById('ctx-toast-' + id);
   if (!t) return;
   const orig = t.textContent;
   if (msg) t.textContent = msg;
   t.classList.add('show');
   setTimeout(() => { t.classList.remove('show'); if (msg) setTimeout(() => t.textContent = orig, 300); }, 2000);
-}
+};
+
+window.ctxAfterItemChanged = function(id, msg) {
+  ctxToast(id, msg);
+  if (typeof window.calRefresh === 'function') window.calRefresh();
+};
 
 // ── Recurrence picker ────────────────────────────────────────────
-async function ctxSetRecurrence(id, rule) {
+window.ctxSetRecurrence = async function(id, rule) {
   const seg = document.getElementById('recur-seg-' + id);
   if (!seg) return;
   seg.querySelectorAll('.ctx-recur-btn').forEach(b => {
@@ -834,5 +1122,6 @@ async function ctxSetRecurrence(id, rule) {
   } else {
     badge?.remove();
   }
+};
 }
 </script>

@@ -19,6 +19,7 @@ from ..db import get_db
 
 router = APIRouter()
 templates = Jinja2Templates(directory=Path(__file__).parent.parent / "templates")
+DAY_WIDTH = 40
 
 
 def _parse_date(s: str | None) -> date | None:
@@ -35,15 +36,18 @@ def _date_range(rows: list[dict]) -> tuple[date, date]:
     today = date.today()
     starts, ends = [], []
     for r in rows:
-        s = _parse_date(r.get("start_date") or r.get("scheduled_at"))
-        e = _parse_date(r.get("end_date") or r.get("due_date") or r.get("scheduled_at"))
+        s = _parse_date(r.get("start_date") or r.get("scheduled_at") or r.get("due_at"))
+        e = _parse_date(r.get("end_date") or r.get("due_date") or r.get("due_at") or r.get("scheduled_at"))
         if s: starts.append(s)
         if e: ends.append(e)
     start = min(starts) if starts else today - timedelta(days=14)
     end = max(ends) if ends else today + timedelta(days=60)
-    # add some padding
+    # Keep a readable time horizon even when the actual work range is short.
     start = start - timedelta(days=2)
     end = end + timedelta(days=7)
+    min_span_days = 45
+    if (end - start).days + 1 < min_span_days:
+        end = start + timedelta(days=min_span_days - 1)
     return start, end
 
 
@@ -59,6 +63,39 @@ def _bar_offset_pct(item_start: date | None, item_end: date | None,
     left = max(0.0, (s - range_start).days / total * 100)
     width = max(1.5, ((e - s).days + 1) / total * 100)  # min 1.5% so even 1-day bars show
     return left, width
+
+
+def _bar_offset_px(item_start: date | None, item_end: date | None,
+                   range_start: date) -> tuple[int, int]:
+    """Returns pixel offsets for the scrollable WBS timeline."""
+    today = date.today()
+    s = item_start or item_end or today
+    e = item_end or item_start or today
+    if e < s:
+        s, e = e, s
+    left = max(0, (s - range_start).days * DAY_WIDTH)
+    width = max(24, ((e - s).days + 1) * DAY_WIDTH)
+    return left, width
+
+
+def _project_item_bounds(db: sqlite3.Connection, project_id: int) -> tuple[str | None, str | None]:
+    """Infer project dates from linked items when the project itself has no dates."""
+    row = db.execute(
+        """
+        SELECT
+          MIN(COALESCE(i.start_date, i.due_date, i.scheduled_at, i.due_at)) AS min_start,
+          MAX(COALESCE(i.due_at, i.due_date, i.start_date, i.scheduled_at)) AS max_end
+        FROM item_projects ip
+        JOIN items i ON i.id = ip.item_id
+        WHERE ip.project_id = ? AND i.status != 'cancelled'
+        """,
+        (project_id,),
+    ).fetchone()
+    if not row:
+        return None, None
+    start = row["min_start"][:10] if row["min_start"] else None
+    end = row["max_end"][:10] if row["max_end"] else None
+    return start, end
 
 
 def _load_project_rows(db: sqlite3.Connection, project_id: int) -> tuple[dict, list[dict]]:
@@ -78,17 +115,30 @@ def _load_project_rows(db: sqlite3.Connection, project_id: int) -> tuple[dict, l
 
     # Top-level tasks under this project
     top = db.execute(
-        """SELECT i.id, i.title, i.status, i.start_date, i.due_date, i.scheduled_at
+        """SELECT i.id, i.title, i.status, i.start_date, i.due_date, i.scheduled_at, i.due_at
            FROM items i
            JOIN item_projects ip ON ip.item_id = i.id
            WHERE ip.project_id = ?
              AND i.status != 'cancelled'
              AND i.parent_id IS NULL
-           ORDER BY COALESCE(i.start_date, i.due_date, i.scheduled_at, '9999')""",
+           ORDER BY COALESCE(i.start_date, i.due_date, i.scheduled_at, i.due_at, '9999')""",
         (project_id,),
     ).fetchall()
 
     rows = []
+    inferred_start, inferred_end = _project_item_bounds(db, project_id)
+    rows.append({
+        "id": proj_d["id"],
+        "title": proj_d["title"],
+        "status": proj_d["status"],
+        "start_date": proj_d["start_date"] or inferred_start,
+        "end_date": proj_d["end_date"] or inferred_end,
+        "depth": 0,
+        "kind": "project",
+        "total": None,
+        "done": None,
+        "pct": None,
+    })
     for t in top:
         td = dict(t)
         td["depth"] = 1
@@ -96,9 +146,9 @@ def _load_project_rows(db: sqlite3.Connection, project_id: int) -> tuple[dict, l
         rows.append(td)
         # children
         children = db.execute(
-            """SELECT id, title, status, start_date, due_date, scheduled_at
+            """SELECT id, title, status, start_date, due_date, scheduled_at, due_at
                FROM items WHERE parent_id = ? AND status != 'cancelled'
-               ORDER BY COALESCE(start_date, due_date, scheduled_at, '9999')""",
+               ORDER BY COALESCE(start_date, due_date, scheduled_at, due_at, '9999')""",
             (td["id"],),
         ).fetchall()
         for c in children:
@@ -133,6 +183,9 @@ def _load_business_rows(db: sqlite3.Connection, biz_id: int) -> tuple[dict, list
         pd = dict(p)
         pd["depth"] = 1
         pd["kind"] = "project"
+        inferred_start, inferred_end = _project_item_bounds(db, pd["id"])
+        pd["start_date"] = pd.get("start_date") or inferred_start
+        pd["end_date"] = pd.get("end_date") or inferred_end
         # Aggregate item_count and done_count for project bar coloring
         agg = db.execute(
             """SELECT COUNT(*) AS total,
@@ -149,13 +202,13 @@ def _load_business_rows(db: sqlite3.Connection, biz_id: int) -> tuple[dict, list
 
         # Top-level tasks under this project
         tasks = db.execute(
-            """SELECT i.id, i.title, i.status, i.start_date, i.due_date, i.scheduled_at
+            """SELECT i.id, i.title, i.status, i.start_date, i.due_date, i.scheduled_at, i.due_at
                FROM items i
                JOIN item_projects ip ON ip.item_id = i.id
                WHERE ip.project_id = ?
                  AND i.status != 'cancelled'
                  AND i.parent_id IS NULL
-               ORDER BY COALESCE(i.start_date, i.due_date, '9999')""",
+               ORDER BY COALESCE(i.start_date, i.due_date, i.scheduled_at, i.due_at, '9999')""",
             (pd["id"],),
         ).fetchall()
         for t in tasks:
@@ -170,8 +223,8 @@ def _enrich_with_bars(rows: list[dict], range_start: date, range_end: date) -> l
     out = []
     for r in rows:
         d = dict(r)
-        s = _parse_date(d.get("start_date") or d.get("scheduled_at"))
-        e = _parse_date(d.get("end_date") or d.get("due_date") or d.get("scheduled_at"))
+        s = _parse_date(d.get("start_date") or d.get("scheduled_at") or d.get("due_at"))
+        e = _parse_date(d.get("end_date") or d.get("due_date") or d.get("due_at") or d.get("scheduled_at"))
         d["bar_start"] = s.isoformat() if s else None
         d["bar_end"] = e.isoformat() if e else None
         d["has_dates"] = bool(s or e)
@@ -179,25 +232,75 @@ def _enrich_with_bars(rows: list[dict], range_start: date, range_end: date) -> l
             left, width = _bar_offset_pct(s, e, range_start, range_end)
             d["bar_left"] = left
             d["bar_width"] = width
+            px_left, px_width = _bar_offset_px(s, e, range_start)
+            d["bar_left_px"] = px_left
+            d["bar_width_px"] = px_width
+            d["bar_left_day"] = px_left // DAY_WIDTH
+            d["bar_width_days"] = max(1, px_width // DAY_WIDTH)
         out.append(d)
     return out
 
 
 def _month_markers(start: date, end: date) -> list[dict]:
-    """Generate month-start position markers across the range."""
+    """Generate month blocks across the range."""
     markers = []
-    total = (end - start).days or 1
     cur = date(start.year, start.month, 1)
-    if cur < start:
-        cur = (cur + timedelta(days=32)).replace(day=1)
     while cur <= end:
-        offset = (cur - start).days / total * 100
-        markers.append({"label": f"{cur.year % 100}.{cur.month:02d}", "left": offset})
-        # next month
         if cur.month == 12:
-            cur = date(cur.year + 1, 1, 1)
+            nxt = date(cur.year + 1, 1, 1)
         else:
-            cur = date(cur.year, cur.month + 1, 1)
+            nxt = date(cur.year, cur.month + 1, 1)
+        block_start = max(cur, start)
+        block_end = min(nxt - timedelta(days=1), end)
+        if block_start <= block_end:
+            markers.append({
+                "label": f"{block_start.year}.{block_start.month:02d}",
+                "left_px": (block_start - start).days * DAY_WIDTH,
+                "width_px": ((block_end - block_start).days + 1) * DAY_WIDTH,
+                "left_day": (block_start - start).days,
+                "width_days": ((block_end - block_start).days + 1),
+            })
+        cur = nxt
+    return markers
+
+
+def _week_markers(start: date, end: date) -> list[dict]:
+    """Generate ISO week header blocks for the scrollable timeline."""
+    markers = []
+    cur = start
+    while cur <= end:
+        week_start = cur - timedelta(days=cur.weekday())
+        week_end = min(week_start + timedelta(days=6), end)
+        block_start = max(week_start, start)
+        iso = block_start.isocalendar()
+        markers.append({
+            "label": f"{iso.year}-W{iso.week:02d}",
+            "left_px": (block_start - start).days * DAY_WIDTH,
+            "width_px": ((week_end - block_start).days + 1) * DAY_WIDTH,
+            "left_day": (block_start - start).days,
+            "width_days": ((week_end - block_start).days + 1),
+        })
+        cur = week_end + timedelta(days=1)
+    return markers
+
+
+def _day_markers(start: date, end: date) -> list[dict]:
+    """Generate day columns for grid lines and day labels."""
+    markers = []
+    today = date.today()
+    cur = start
+    while cur <= end:
+        label = f"{cur.month:02d}.{cur.day:02d}" if cur.day == 1 or cur == start else f"{cur.day:02d}"
+        markers.append({
+            "label": label,
+            "weekday": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][cur.weekday()],
+            "date": cur.isoformat(),
+            "left_px": (cur - start).days * DAY_WIDTH,
+            "left_day": (cur - start).days,
+            "is_weekend": cur.weekday() >= 5,
+            "is_today": cur == today,
+        })
+        cur += timedelta(days=1)
     return markers
 
 
@@ -246,12 +349,22 @@ async def wbs_page(
         range_start, range_end = _date_range(rows)
         rows = _enrich_with_bars(rows, range_start, range_end)
         markers = _month_markers(range_start, range_end)
+        week_markers = _week_markers(range_start, range_end)
+        day_markers = _day_markers(range_start, range_end)
+        timeline_width = max(880, ((range_end - range_start).days + 1) * DAY_WIDTH)
         today_offset = (today - range_start).days / max(1, (range_end - range_start).days) * 100
+        today_offset_px = (today - range_start).days * DAY_WIDTH
+        today_offset_day = (today - range_start).days
     else:
         range_start = today - timedelta(days=14)
         range_end = today + timedelta(days=60)
         markers = []
+        week_markers = []
+        day_markers = []
+        timeline_width = 720
         today_offset = None
+        today_offset_px = None
+        today_offset_day = None
 
     return templates.TemplateResponse(
         request,
@@ -266,7 +379,12 @@ async def wbs_page(
             "range_start": range_start.isoformat(),
             "range_end": range_end.isoformat(),
             "markers": markers,
+            "week_markers": week_markers,
+            "day_markers": day_markers,
+            "timeline_width": timeline_width,
             "today_offset": today_offset,
+            "today_offset_px": today_offset_px,
+            "today_offset_day": today_offset_day,
             "today": today.isoformat(),
         },
     )

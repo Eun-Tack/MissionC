@@ -150,25 +150,13 @@
     <div class="cal-toolbar">
       <!-- Prev/Next nav -->
       <div class="cal-nav">
-        <button class="cal-nav-btn"
-                hx-get="/partial/calendar?mode={{ mode }}&date_str={{ prev_anchor }}"
-                hx-target="#cal-grid"
-                hx-swap="innerHTML"
-                hx-push-url="/calendar?mode={{ mode }}&date_str={{ prev_anchor }}">‹</button>
-        <button class="cal-nav-btn"
-                hx-get="/partial/calendar?mode={{ mode }}&date_str={{ next_anchor }}"
-                hx-target="#cal-grid"
-                hx-swap="innerHTML"
-                hx-push-url="/calendar?mode={{ mode }}&date_str={{ next_anchor }}">›</button>
+        <button class="cal-nav-btn" type="button" onclick="calGo('prev')">‹</button>
+        <button class="cal-nav-btn" type="button" onclick="calGo('next')">›</button>
       </div>
 
       <span class="cal-label" id="cal-label">{{ label }}</span>
 
-      <button class="today-btn"
-              hx-get="/partial/calendar?mode={{ mode }}&date_str={{ today }}"
-              hx-target="#cal-grid"
-              hx-swap="innerHTML"
-              hx-push-url="/calendar?mode={{ mode }}&date_str={{ today }}">오늘</button>
+      <button class="today-btn" type="button" onclick="calGo('today')">오늘</button>
 
       <!-- Add event button -->
       <button class="cal-add-btn" onclick="openNewEvent('{{ today }}')">＋ 일정</button>
@@ -177,18 +165,9 @@
 
       <!-- Mode switcher -->
       <div class="mode-group">
-        <button class="mode-btn {{ 'active' if mode == 'day' else '' }}"
-                hx-get="/partial/calendar?mode=day&date_str={{ anchor }}"
-                hx-target="#cal-grid" hx-swap="innerHTML"
-                hx-push-url="/calendar?mode=day&date_str={{ anchor }}">일</button>
-        <button class="mode-btn {{ 'active' if mode == 'week' else '' }}"
-                hx-get="/partial/calendar?mode=week&date_str={{ anchor }}"
-                hx-target="#cal-grid" hx-swap="innerHTML"
-                hx-push-url="/calendar?mode=week&date_str={{ anchor }}">주</button>
-        <button class="mode-btn {{ 'active' if mode == 'month' else '' }}"
-                hx-get="/partial/calendar?mode=month&date_str={{ anchor }}"
-                hx-target="#cal-grid" hx-swap="innerHTML"
-                hx-push-url="/calendar?mode=month&date_str={{ anchor }}">월</button>
+        <button class="mode-btn {{ 'active' if mode == 'day' else '' }}" data-cal-mode="day" type="button" onclick="calSetMode('day')">일</button>
+        <button class="mode-btn {{ 'active' if mode == 'week' else '' }}" data-cal-mode="week" type="button" onclick="calSetMode('week')">주</button>
+        <button class="mode-btn {{ 'active' if mode == 'month' else '' }}" data-cal-mode="month" type="button" onclick="calSetMode('month')">월</button>
       </div>
     </div>
 
@@ -306,7 +285,7 @@
     <div class="ne-field">
       <label class="ne-label" for="ne-project">프로젝트</label>
       <select class="ne-select" id="ne-project">
-        <option value="">— 먼저 사업 선택</option>
+        <option value="">— 미연결로 저장</option>
       </select>
     </div>
 
@@ -334,8 +313,123 @@
 <script>
   let _neCurrentMode = '{{ mode }}';
   let _neCurrentAnchor = '{{ anchor }}';
+  let _calPrevAnchor = '{{ prev_anchor }}';
+  let _calNextAnchor = '{{ next_anchor }}';
+  const _calToday = '{{ today }}';
   const NE_BUSINESSES = {{ businesses | tojson }};
   const NE_PROJECTS = {{ projects | tojson }};
+
+  function calDateFromISO(iso) {
+    const [y, m, d] = String(iso || _calToday).split('-').map(Number);
+    return new Date(y, (m || 1) - 1, d || 1);
+  }
+
+  function calISO(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  function calAddDays(iso, days) {
+    const date = calDateFromISO(iso);
+    date.setDate(date.getDate() + days);
+    return calISO(date);
+  }
+
+  function calAddMonths(iso, months) {
+    const date = calDateFromISO(iso);
+    date.setMonth(date.getMonth() + months, 1);
+    return calISO(date);
+  }
+
+  function calWeekStart(iso) {
+    const date = calDateFromISO(iso);
+    const day = (date.getDay() + 6) % 7;
+    date.setDate(date.getDate() - day);
+    return calISO(date);
+  }
+
+  function calLabel(mode, anchor) {
+    const d = calDateFromISO(anchor);
+    if (mode === 'month') return `${d.getFullYear()}년 ${d.getMonth() + 1}월`;
+    if (mode === 'day') {
+      const wd = ['일', '월', '화', '수', '목', '금', '토'][d.getDay()];
+      return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 (${wd})`;
+    }
+    const start = calDateFromISO(calWeekStart(anchor));
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    return `${start.getMonth() + 1}월 ${start.getDate()}일 - ${end.getMonth() + 1}월 ${end.getDate()}일`;
+  }
+
+  function calStateFor(mode, anchor) {
+    const normalized = mode === 'week' ? calWeekStart(anchor) : (mode === 'month' ? calAddMonths(anchor, 0) : anchor);
+    if (mode === 'month') {
+      return {
+        anchor: normalized,
+        prev: calAddMonths(normalized, -1),
+        next: calAddMonths(normalized, 1),
+        label: calLabel(mode, normalized)
+      };
+    }
+    const step = mode === 'week' ? 7 : 1;
+    return {
+      anchor: normalized,
+      prev: calAddDays(normalized, -step),
+      next: calAddDays(normalized, step),
+      label: calLabel(mode, normalized)
+    };
+  }
+
+  function calRenderToolbar(mode, anchor) {
+    const state = calStateFor(mode, anchor);
+    _neCurrentMode = mode;
+    _neCurrentAnchor = state.anchor;
+    _calPrevAnchor = state.prev;
+    _calNextAnchor = state.next;
+    const labelEl = document.getElementById('cal-label');
+    if (labelEl) labelEl.textContent = state.label;
+    document.querySelectorAll('.mode-btn[data-cal-mode]').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.calMode === mode);
+    });
+    return state;
+  }
+
+  function calNavigate(mode, anchor, pushUrl = true) {
+    const state = calRenderToolbar(mode, anchor);
+    htmx.ajax('GET', `/partial/calendar?mode=${mode}&date_str=${state.anchor}`, {
+      target: '#cal-grid',
+      swap: 'innerHTML'
+    });
+    if (pushUrl) history.pushState(null, '', `/calendar?mode=${mode}&date_str=${state.anchor}`);
+  }
+
+  function calGo(which) {
+    const anchor = which === 'prev' ? _calPrevAnchor : (which === 'next' ? _calNextAnchor : _calToday);
+    calNavigate(_neCurrentMode, anchor);
+  }
+
+  function calSetMode(mode) {
+    calNavigate(mode, _neCurrentAnchor);
+  }
+
+  window.calRefresh = function() {
+    htmx.ajax('GET', `/partial/calendar?mode=${_neCurrentMode}&date_str=${_neCurrentAnchor}`, {
+      target: '#cal-grid',
+      swap: 'innerHTML'
+    });
+  };
+
+  function calSyncToolbar(mode, anchor, prevAnchor, nextAnchor, label) {
+    const state = calRenderToolbar(mode, anchor);
+    _calPrevAnchor = prevAnchor || state.prev;
+    _calNextAnchor = nextAnchor || state.next;
+    const labelEl = document.getElementById('cal-label');
+    if (labelEl && label) labelEl.textContent = label;
+  }
+
+  calRenderToolbar(_neCurrentMode, _neCurrentAnchor);
 
   function neOption(value, label) {
     const opt = document.createElement('option');
@@ -361,7 +455,7 @@
   function neRefreshProjects() {
     const bizId = document.getElementById('ne-business').value;
     const rows = bizId ? NE_PROJECTS.filter(p => String(p.business_id || '') === bizId) : [];
-    neSetOptions('ne-project', rows, bizId ? '— 프로젝트 선택' : '— 먼저 사업 선택', p => p.title);
+    neSetOptions('ne-project', rows, bizId ? '— 프로젝트 선택 안 함' : '— 미연결로 저장', p => p.title);
   }
 
   function neOnOrgChange() {
@@ -389,7 +483,7 @@
     document.getElementById('ne-block-checklist').style.display  = isTask  ? '' : 'none';
   }
 
-  function openNewEvent(dateStr, timeStr) {
+  function openNewEvent(dateStr, timeStr, endTimeStr) {
     ['ne-title','ne-body'].forEach(id => { document.getElementById(id).value = ''; });
     ['ne-start-date','ne-start-time','ne-end-date','ne-end-time',
      'ne-task-sdate','ne-task-due','ne-memo-date'].forEach(id => {
@@ -404,8 +498,14 @@
     document.getElementById('ne-start-date').value  = d;
     document.getElementById('ne-task-sdate').value  = d;
     document.getElementById('ne-memo-date').value   = d;
-    if (timeStr) document.getElementById('ne-start-time').value = timeStr;
-    neSetType('task', document.querySelector('[data-type="task"]'));
+    if (timeStr) {
+      document.getElementById('ne-start-time').value = timeStr;
+      document.getElementById('ne-end-date').value = d;
+      document.getElementById('ne-end-time').value = endTimeStr || '';
+      neSetType('schedule', document.querySelector('[data-type="schedule"]'));
+    } else {
+      neSetType('task', document.querySelector('[data-type="task"]'));
+    }
     document.getElementById('new-event-drawer').classList.add('open');
     setTimeout(() => document.getElementById('ne-title').focus(), 280);
   }
@@ -442,11 +542,6 @@
     const project_id = document.getElementById('ne-project').value;
     const body       = document.getElementById('ne-body').value.trim();
     const recurrence = document.getElementById('ne-recur').value;
-    if ((org_id || business_id) && !project_id) {
-      document.getElementById('ne-error').textContent = '소속에 연결하려면 프로젝트까지 선택하세요';
-      document.getElementById('ne-project').focus();
-      return;
-    }
 
     let scheduled_at = '', end_at = '', start_date = '', due_date = '';
     if (type === 'schedule') {
@@ -459,8 +554,6 @@
     } else if (type === 'task') {
       start_date = document.getElementById('ne-task-sdate').value;
       due_date   = document.getElementById('ne-task-due').value;
-      if (start_date)    scheduled_at = `${start_date}T00:00:00Z`;
-      else if (due_date) scheduled_at = `${due_date}T00:00:00Z`;
     } else {
       const md = document.getElementById('ne-memo-date').value;
       if (md) scheduled_at = `${md}T00:00:00Z`;
@@ -516,6 +609,111 @@
       btn.disabled = false; btn.textContent = '등록';
     }
   }
+
+  function calInitDragCreate() {
+    if (window._calDragCreateDelegated) return;
+    window._calDragCreateDelegated = true;
+    let state = null;
+    const snap = 15;
+
+    function gridCfg() {
+      return {
+        hourPx: Number(getComputedStyle(document.documentElement).getPropertyValue('--unused')) || 64,
+        start: 7,
+        end: 23
+      };
+    }
+
+    function cfgFromGrid() {
+      const body = document.querySelector('.wg-body');
+      const height = body ? body.getBoundingClientRect().height : 1024;
+      return { hourPx: height / 16, start: 7, end: 23 };
+    }
+
+    function timeFromY(y) {
+      const cfg = cfgFromGrid() || gridCfg();
+      const minutes = Math.round((Math.max(0, y) / cfg.hourPx) * 60 / snap) * snap + cfg.start * 60;
+      const clamped = Math.max(cfg.start * 60, Math.min(cfg.end * 60, minutes));
+      return `${String(Math.floor(clamped / 60)).padStart(2, '0')}:${String(clamped % 60).padStart(2, '0')}`;
+    }
+
+    function cueFor(col) {
+      let cue = col.querySelector(':scope > .wg-hover-cue');
+      if (!cue) {
+        cue = document.createElement('div');
+        cue.className = 'wg-hover-cue';
+        cue.innerHTML = '<span></span>';
+        col.appendChild(cue);
+      }
+      return cue;
+    }
+
+    function yFromEvent(col, event) {
+      const rect = col.getBoundingClientRect();
+      return event.clientY - rect.top;
+    }
+
+    document.addEventListener('mousemove', (event) => {
+      const col = event.target.closest?.('.wg-day-col');
+      document.querySelectorAll('.wg-hover-cue').forEach(cue => {
+        if (!col || cue.parentElement !== col || state) cue.style.display = 'none';
+      });
+      if (!col || state || event.target.closest('.timed-item')) return;
+      const y = yFromEvent(col, event);
+      const cfg = cfgFromGrid();
+      const snapY = Math.max(0, Math.round(y / (cfg.hourPx / 4)) * (cfg.hourPx / 4));
+      const cue = cueFor(col);
+      cue.style.display = 'block';
+      cue.style.top = `${snapY}px`;
+      cue.querySelector('span').textContent = `${timeFromY(snapY)} 드래그`;
+    });
+
+    document.addEventListener('mouseleave', () => {
+      document.querySelectorAll('.wg-hover-cue').forEach(cue => { cue.style.display = 'none'; });
+    });
+
+    document.addEventListener('mousedown', (event) => {
+      const col = event.target.closest?.('.wg-day-col');
+      if (!col || event.button !== 0 || event.target.closest('.timed-item')) return;
+      event.preventDefault();
+      col.querySelector(':scope > .wg-hover-cue')?.remove();
+      const startY = yFromEvent(col, event);
+      const box = document.createElement('div');
+      box.className = 'wg-drag-select';
+      box.style.top = `${startY}px`;
+      box.style.height = '2px';
+      col.appendChild(box);
+      state = { col, day: col.dataset.day, startY, endY: startY, box };
+    });
+
+    document.addEventListener('mousemove', (event) => {
+      if (!state) return;
+      state.endY = yFromEvent(state.col, event);
+      const top = Math.max(0, Math.min(state.startY, state.endY));
+      const bottom = Math.max(state.startY, state.endY);
+      state.box.style.top = `${top}px`;
+      state.box.style.height = `${Math.max(18, bottom - top)}px`;
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (!state) return;
+      const top = Math.min(state.startY, state.endY);
+      const bottom = Math.max(state.startY, state.endY);
+      const startTime = timeFromY(top);
+      let endTime = timeFromY(bottom);
+      if (startTime === endTime) {
+        const [h, m] = startTime.split(':').map(Number);
+        const next = Math.min(23 * 60, h * 60 + m + 30);
+        endTime = `${String(Math.floor(next / 60)).padStart(2, '0')}:${String(next % 60).padStart(2, '0')}`;
+      }
+      state.box.remove();
+      const day = state.day;
+      state = null;
+      openNewEvent(day, startTime, endTime);
+    });
+  }
+
+  calInitDragCreate();
 
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {

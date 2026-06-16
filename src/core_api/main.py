@@ -12,12 +12,13 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from .config import reload_config
-from .routers import flow, items, hierarchy, review, setup, inbox, diagnostics, search, calendar, wbs, voice, notifications, dashboard, ai_suggest, contacts, auth
+from .routers import flow, items, hierarchy, review, setup, inbox, diagnostics, search, calendar, wbs, voice, notifications, dashboard, ai_suggest, contacts, auth, links
 
 log = logging.getLogger("mc.main")
 
 _STATIC_DIR = Path(__file__).parent / "static"
 _PROJECT_ROOT = Path(__file__).parent.parent.parent
+_PROD = os.environ.get("MC_ENV", "development") == "production"
 
 try:
     from dotenv import load_dotenv
@@ -75,7 +76,12 @@ async def auth_guard(request: Request, call_next):
 
 # SessionMiddleware added last → outermost layer → runs before auth_guard
 _SESSION_SECRET = os.environ.get("SESSION_SECRET", "mc-dev-secret-change-in-prod")
-app.add_middleware(SessionMiddleware, secret_key=_SESSION_SECRET, https_only=False)
+if _PROD:
+    if _SESSION_SECRET == "mc-dev-secret-change-in-prod":
+        raise RuntimeError("SESSION_SECRET must be set in production")
+    if not os.environ.get("GOOGLE_CLIENT_ID"):
+        raise RuntimeError("GOOGLE_CLIENT_ID must be set in production")
+app.add_middleware(SessionMiddleware, secret_key=_SESSION_SECRET, https_only=_PROD, same_site="lax")
 
 # Static files (app.js, radial.css, radial.js …)
 _STATIC_DIR.mkdir(parents=True, exist_ok=True)
@@ -98,6 +104,7 @@ app.include_router(notifications.router)
 app.include_router(dashboard.router)
 app.include_router(ai_suggest.router)
 app.include_router(contacts.router)
+app.include_router(links.router)
 
 
 @app.get("/health")

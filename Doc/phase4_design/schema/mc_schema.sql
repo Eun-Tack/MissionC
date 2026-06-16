@@ -21,6 +21,20 @@ CREATE TABLE IF NOT EXISTS organizations (
     created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 
+CREATE TABLE IF NOT EXISTS organization_profiles (
+    org_id                INTEGER PRIMARY KEY REFERENCES organizations(id) ON DELETE CASCADE,
+    purpose               TEXT,
+    operating_scope       TEXT,
+    stakeholders          TEXT,
+    role_title            TEXT,
+    role_responsibilities TEXT,
+    decision_rights       TEXT,
+    role_kpis             TEXT,
+    ai_guidance           TEXT,
+    constraints           TEXT,
+    updated_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+
 CREATE TABLE IF NOT EXISTS businesses (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     org_id      INTEGER REFERENCES organizations(id) ON DELETE RESTRICT,  -- BR-ORG-01
@@ -118,6 +132,32 @@ CREATE TABLE IF NOT EXISTS item_projects (
     PRIMARY KEY (item_id, project_id)
 );
 
+CREATE TABLE IF NOT EXISTS item_links (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    src_type   TEXT NOT NULL CHECK(src_type IN ('project','item','gh_issue','gh_pr','gcal_event','drive_file')),
+    src_id     INTEGER NOT NULL,
+    dst_type   TEXT NOT NULL CHECK(dst_type IN ('project','item','gh_issue','gh_pr','gcal_event','drive_file')),
+    dst_id     INTEGER NOT NULL,
+    relation   TEXT NOT NULL DEFAULT 'relates_to'
+               CHECK(relation IN ('relates_to','blocks','depends_on','supports','duplicates','parent_child')),
+    reason     TEXT,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    UNIQUE(src_type, src_id, dst_type, dst_id, relation)
+);
+CREATE INDEX IF NOT EXISTS idx_item_links_src ON item_links(src_type, src_id);
+CREATE INDEX IF NOT EXISTS idx_item_links_dst ON item_links(dst_type, dst_id);
+
+CREATE TABLE IF NOT EXISTS integration_state (
+    provider        TEXT PRIMARY KEY,
+    status          TEXT NOT NULL DEFAULT 'unknown'
+                    CHECK(status IN ('unknown','ok','not_configured','error')),
+    last_success_at TEXT,
+    last_error_at   TEXT,
+    last_error      TEXT,
+    last_run_at     TEXT,
+    updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+
 CREATE TABLE IF NOT EXISTS schedules (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     item_id     INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
@@ -143,6 +183,25 @@ CREATE TABLE IF NOT EXISTS item_labels (
     label_id INTEGER NOT NULL REFERENCES labels(id) ON DELETE CASCADE,
     PRIMARY KEY (item_id, label_id)
 );
+
+CREATE TABLE IF NOT EXISTS contacts (
+    id         INTEGER PRIMARY KEY,
+    name       TEXT NOT NULL,
+    email      TEXT,
+    phone      TEXT,
+    org        TEXT,
+    notes      TEXT,
+    created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+);
+
+CREATE TABLE IF NOT EXISTS item_contacts (
+    item_id    INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+    contact_id INTEGER NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+    role       TEXT NOT NULL DEFAULT 'attendee',
+    PRIMARY KEY (item_id, contact_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_item_contacts_item ON item_contacts(item_id);
 
 -- ─────────────────────────────────────────
 -- External integrations
@@ -171,12 +230,35 @@ CREATE TABLE IF NOT EXISTS gcal_cache (
     end_at         TEXT,
     description    TEXT,
     location       TEXT,
+    mc_item_id     INTEGER REFERENCES items(id),
+    mc_kind        TEXT,
+    mc_last_seen_status TEXT,
     mc_status      TEXT    CHECK(mc_status IN ('done', NULL)),  -- BR-GCAL-05: 로컬 완료 상태만
     visible        INTEGER NOT NULL DEFAULT 1,         -- BR-GCAL-04: GCal 삭제 시 0
     fetched_at     TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_gcal_cache_start ON gcal_cache(start_at, visible);
+CREATE INDEX IF NOT EXISTS idx_gcal_cache_mc_item ON gcal_cache(mc_item_id);
+
+CREATE TABLE IF NOT EXISTS mobile_sync_actions (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    provider       TEXT NOT NULL DEFAULT 'gcal',
+    external_id    TEXT NOT NULL,
+    item_id        INTEGER REFERENCES items(id) ON DELETE SET NULL,
+    action         TEXT NOT NULL CHECK(action IN ('mark_done','mark_waiting','cancel','reschedule','note')),
+    title          TEXT NOT NULL,
+    old_value      TEXT,
+    new_value      TEXT,
+    payload        TEXT,
+    status         TEXT NOT NULL DEFAULT 'pending'
+                   CHECK(status IN ('pending','accepted','rejected')),
+    created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    resolved_at    TEXT,
+    UNIQUE(provider, external_id, action, new_value, status)
+);
+
+CREATE INDEX IF NOT EXISTS idx_mobile_sync_actions_status ON mobile_sync_actions(status, created_at);
 
 -- Capture inbox — Telegram, voice, quick capture 통합 큐 (FR-INBOX-01)
 CREATE TABLE IF NOT EXISTS capture_inbox (

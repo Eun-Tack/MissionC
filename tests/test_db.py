@@ -25,7 +25,8 @@ REQUIRED_TABLES = [
     "capture_inbox", "incomplete_reasons",
     "notification_events", "retry_queue",
     "review_memos", "file_index",
-    "settings",
+    "settings", "item_links", "integration_state", "mobile_sync_actions",
+    "organization_profiles",
 ]
 
 REQUIRED_SETTINGS = [

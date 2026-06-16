@@ -2,12 +2,12 @@
 
 <style>
 /* ── Shared ─────────────────────────────────────────── */
-.wg-wrap  { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+.wg-wrap  { display: flex; flex-direction: column; height: 100%; overflow: hidden; --cal-scrollbar: 17px; }
 .wg-gutter { width: 52px; flex-shrink: 0; border-right: 1px solid var(--border); }
 
 /* ── Week/Day header ────────────────────────────────── */
 .wg-head   { display: flex; border-bottom: 1px solid var(--border);
-             background: var(--surface); flex-shrink: 0; }
+             background: var(--surface); flex-shrink: 0; padding-right: var(--cal-scrollbar); box-sizing: border-box; }
 .wg-dayhdr { flex: 1; padding: 8px 0 10px; text-align: center;
              border-right: 1px solid var(--border); cursor: pointer;
              transition: background 80ms; }
@@ -23,7 +23,7 @@
 
 /* ── All-day row ────────────────────────────────────── */
 .wg-allday-row   { display: flex; min-height: 32px; border-bottom: 2px solid var(--border);
-                   flex-shrink: 0; }
+                   flex-shrink: 0; padding-right: var(--cal-scrollbar); box-sizing: border-box; }
 .wg-allday-label { width: 52px; flex-shrink: 0; border-right: 1px solid var(--border);
                    font-size: 9px; color: var(--muted); padding: 7px 5px 0;
                    text-align: right; line-height: 1.3; }
@@ -32,14 +32,15 @@
 .wg-allday-col:last-child { border-right: none; }
 
 /* ── Scrollable time grid ───────────────────────────── */
-.wg-body-scroll { flex: 1; overflow-y: auto; }
-.wg-body        { display: flex; position: relative; }
+.wg-body-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; scrollbar-gutter: stable; }
+.wg-body        { display: flex; position: relative; min-width: 100%; }
 .wg-time-col    { width: 52px; flex-shrink: 0; border-right: 1px solid var(--border);
                   position: relative; }
 .wg-hour-label  { position: absolute; right: 8px; font-size: 10px; color: var(--muted);
                   transform: translateY(-50%); white-space: nowrap; user-select: none; }
 .wg-day-col     { flex: 1; position: relative; border-right: 1px solid var(--border);
-                  overflow: hidden; }
+                  overflow: hidden; cursor: crosshair; }
+.wg-day-col:hover { background: oklch(65% 0.03 260 / 0.06); }
 .wg-day-col:last-child { border-right: none; }
 .wg-hline       { position: absolute; left: 0; right: 0; border-top: 1px solid var(--border);
                   opacity: 0.5; pointer-events: none; }
@@ -59,6 +60,8 @@
 .timed-item.gcal     { background: oklch(91% 0.07 250); color: oklch(28% 0.2 250); border-left-color: oklch(45% 0.2 250); }
 .timed-item.memo     { background: oklch(95% 0.05 60);  color: oklch(38% 0.14 60); border-left-color: oklch(55% 0.15 60); }
 .timed-item.done     { opacity: 0.5; }
+.timed-item.has-conflict { outline: 2px solid oklch(55% 0.22 25); outline-offset: -2px; }
+.conflict-mark { margin-left: 4px; color: oklch(45% 0.2 25); font-weight: 800; }
 
 /* ── All-day / month chips ──────────────────────────── */
 .cal-item { padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 500;
@@ -79,6 +82,20 @@
 .wg-now::before { content: ''; position: absolute; left: -4px; top: -4px;
                   width: 10px; height: 10px; border-radius: 50%;
                   background: oklch(55% 0.25 15); }
+.wg-drag-select {
+  position: absolute; left: 3px; right: 3px; border-radius: 6px;
+  background: oklch(65% 0.16 260 / 0.18); border: 1px solid var(--brand);
+  pointer-events: none; z-index: 4;
+}
+.wg-hover-cue {
+  position: absolute; left: 3px; right: 3px; height: 24px; border-radius: 6px;
+  background: oklch(65% 0.16 260 / 0.10); border: 1px dashed var(--brand);
+  pointer-events: none; z-index: 3; display: none;
+}
+.wg-hover-cue span {
+  position: absolute; left: 8px; top: 3px; padding: 1px 6px; border-radius: 999px;
+  background: var(--brand); color: white; font-size: 10px; font-weight: 700;
+}
 
 /* ── Day-add button ─────────────────────────────────── */
 .day-add-btn { display: none; position: absolute; bottom: 5px; right: 5px;
@@ -120,9 +137,7 @@
     {% for d in days %}
     <div class="wg-dayhdr {{ 'wg-today' if d == today else '' }}"
          {% if mode == 'week' %}
-         hx-get="/partial/calendar?mode=day&date_str={{ d }}"
-         hx-target="#cal-grid" hx-swap="innerHTML"
-         hx-push-url="/calendar?mode=day&date_str={{ d }}"
+         onclick="calNavigate('day', '{{ d }}')"
          {% endif %}>
       {% if mode == 'week' %}<div class="wg-wd">{{ weekday_names[loop.index0] }}</div>{% endif %}
       {% if d == today %}
@@ -172,7 +187,7 @@
 
       {# Day columns #}
       {% for d in days %}
-      <div class="wg-day-col" data-day="{{ d }}" style="height:{{ grid_height }}px;">
+      <div class="wg-day-col" data-day="{{ d }}" style="height:{{ grid_height }}px;" title="드래그해서 시간 일정 만들기">
 
         {# Hour lines #}
         {% for h in grid_hours %}
@@ -182,9 +197,9 @@
 
         {# Timed items #}
         {% for item in timed_by_day.get(d, []) %}
-        <div class="timed-item {{ 'gcal' if item.type == 'gcal' else item.type }} {{ 'done' if item.status == 'done' else '' }}"
+        <div class="timed-item {{ 'gcal' if item.type == 'gcal' else item.type }} {{ 'done' if item.status == 'done' else '' }} {% if item.conflict_count %}has-conflict{% endif %}"
              style="top:{{ item.top_px }}px; height:{{ item.height_px }}px;"
-             title="{{ item.title }}"
+             title="{{ item.title }}{% if item.conflict_count %} · 충돌: {{ item.conflict_titles }}{% endif %}"
              {% if item.type != 'gcal' %}
              hx-get="/partial/context/{{ item.id }}"
              hx-target="#cal-drawer-body" hx-swap="innerHTML"
@@ -193,7 +208,7 @@
           {% set start_label = (item.effective_start or item.scheduled_at or '')[11:16] %}
           {% set end_label   = (item.end_at or '')[11:16] %}
           {% if item.height_px >= 40 %}
-          <div class="timed-title">{{ _type_icon.get(item.type, '●') }} {{ item.title }}</div>
+          <div class="timed-title">{{ _type_icon.get(item.type, '●') }} {{ item.title }}{% if item.conflict_count %}<span class="conflict-mark">충돌</span>{% endif %}</div>
           <div class="timed-time">{{ start_label }}{% if end_label %} – {{ end_label }}{% endif %}</div>
           {% else %}
           <div class="timed-title">{{ start_label }} {{ item.title }}</div>
@@ -249,14 +264,13 @@
 
 {% endif %}
 
-{% if request.headers.get('hx-request') %}
-<span id="cal-label" hx-swap-oob="true">{{ label }}</span>
-{% endif %}
-
 <script>
 if (typeof _neCurrentMode !== 'undefined') {
   _neCurrentMode = '{{ mode }}';
   _neCurrentAnchor = '{{ anchor }}';
+}
+if (typeof calSyncToolbar === 'function') {
+  calSyncToolbar('{{ mode }}', '{{ anchor }}', '{{ prev_anchor }}', '{{ next_anchor }}', {{ label | tojson }});
 }
 
 // Time grid: scroll to current time + draw "now" line
@@ -264,6 +278,11 @@ if (typeof _neCurrentMode !== 'undefined') {
   if ('{{ mode }}' !== 'week' && '{{ mode }}' !== 'day') return;
   const scroll = document.getElementById('wg-scroll');
   if (!scroll) return;
+  const wrap = scroll.closest('.wg-wrap');
+  if (wrap) {
+    const scrollbar = scroll.offsetWidth - scroll.clientWidth;
+    wrap.style.setProperty('--cal-scrollbar', `${Math.max(0, scrollbar)}px`);
+  }
 
   const now = new Date();
   const h = now.getHours(), m = now.getMinutes();
@@ -287,5 +306,70 @@ if (typeof _neCurrentMode !== 'undefined') {
     // Default: scroll to 8am
     scroll.scrollTop = (8 - GRID_START) * HOUR_PX;
   }
+})();
+
+// Drag on the time grid to create a schedule with start/end time.
+(function() {
+  if ('{{ mode }}' !== 'week' && '{{ mode }}' !== 'day') return;
+  if (typeof openNewEvent !== 'function') return;
+  const HOUR_PX = {{ hour_px }};
+  const GRID_START = {{ grid_start_h }};
+  const GRID_END = {{ grid_end_h }};
+  const snap = 15;
+  let state = null;
+
+  function timeFromY(y) {
+    const raw = Math.max(0, y);
+    const minutes = Math.round((raw / HOUR_PX) * 60 / snap) * snap + GRID_START * 60;
+    const clamped = Math.max(GRID_START * 60, Math.min(GRID_END * 60, minutes));
+    const h = String(Math.floor(clamped / 60)).padStart(2, '0');
+    const m = String(clamped % 60).padStart(2, '0');
+    return `${h}:${m}`;
+  }
+
+  function yFromEvent(col, event) {
+    const rect = col.getBoundingClientRect();
+    return event.clientY - rect.top;
+  }
+
+  document.querySelectorAll('.wg-day-col').forEach(col => {
+    col.addEventListener('mousedown', (event) => {
+      if (event.button !== 0 || event.target.closest('.timed-item')) return;
+      event.preventDefault();
+      const startY = yFromEvent(col, event);
+      const box = document.createElement('div');
+      box.className = 'wg-drag-select';
+      box.style.top = `${startY}px`;
+      box.style.height = '2px';
+      col.appendChild(box);
+      state = { col, day: col.dataset.day, startY, endY: startY, box };
+    });
+  });
+
+  document.addEventListener('mousemove', (event) => {
+    if (!state) return;
+    state.endY = yFromEvent(state.col, event);
+    const top = Math.max(0, Math.min(state.startY, state.endY));
+    const bottom = Math.max(state.startY, state.endY);
+    state.box.style.top = `${top}px`;
+    state.box.style.height = `${Math.max(18, bottom - top)}px`;
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!state) return;
+    const top = Math.min(state.startY, state.endY);
+    const bottom = Math.max(state.startY, state.endY);
+    const startTime = timeFromY(top);
+    let endTime = timeFromY(bottom);
+    if (startTime === endTime) {
+      const [h, m] = startTime.split(':').map(Number);
+      const next = Math.min(GRID_END * 60, h * 60 + m + 30);
+      endTime = `${String(Math.floor(next / 60)).padStart(2, '0')}:${String(next % 60).padStart(2, '0')}`;
+    }
+    state.box.remove();
+    const day = state.day;
+    state = null;
+    openNewEvent(day, startTime, endTime);
+  });
 })();
 </script>

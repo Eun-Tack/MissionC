@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{% block title %}MC{% endblock %}</title>
 <script src="/static/vendor/htmx.min.js?v=20260528-2"></script>
+  <script src="/static/context_panel.js?v=20260602-3"></script>
 <style>
   :root {
     --bg: oklch(99% 0.005 270); --fg: oklch(20% 0.02 270);
@@ -86,6 +87,7 @@
             display: inline-flex; align-items: center; gap: 3px; }
   .nav a:hover  { color: var(--fg); }
   .nav a.active { color: var(--fg); background: var(--surface-2); }
+  :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 4px; }
   .nav-badge { display: inline-flex; align-items: center; justify-content: center;
                min-width: 16px; height: 16px; border-radius: 8px; background: var(--brand);
                color: white; font-size: 10px; font-weight: 700; padding: 0 3px; margin-left: 3px; }
@@ -104,13 +106,6 @@ document.addEventListener('click', function(e) {
   if (row) {
     document.querySelectorAll('.row.selected').forEach(r => r.classList.remove('selected'));
     row.classList.add('selected');
-  }
-});
-// Quick capture: submit on Enter
-document.addEventListener('keydown', function(e) {
-  if (e.key === 'Enter' && e.target.id === 'capture-input') {
-    e.target.closest('form').requestSubmit();
-    e.target.value = '';
   }
 });
 // Nav badges: load counts on every page

@@ -10,6 +10,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
+from fastapi.responses import JSONResponse
 from fastapi.templating import Jinja2Templates
 
 from ..db import get_db
@@ -22,6 +23,109 @@ _STATUS_LABELS = {
     "done": "완료", "paused": "중단", "archived": "보관",
 }
 _VALID_PROJ_STATUSES = {"planning", "active", "review", "paused", "done"}
+
+
+def _project_close_gate(db: sqlite3.Connection, project_id: int) -> dict:
+    """Return lightweight checks that should be reviewed before closing a project."""
+    from .links import _ensure_project_external_links, _label_for
+
+    _ensure_project_external_links(db, project_id)
+    project = db.execute(
+        "SELECT id, title, github_repo FROM projects WHERE id=?",
+        (project_id,),
+    ).fetchone()
+    if not project:
+        return {"has_risk": False, "warnings": [], "counts": {}}
+
+    open_items = db.execute(
+        """
+        SELECT COUNT(*)
+        FROM item_projects ip
+        JOIN items i ON i.id=ip.item_id
+        WHERE ip.project_id=?
+          AND i.status NOT IN ('done','cancelled')
+        """,
+        (project_id,),
+    ).fetchone()[0]
+
+    warnings: list[dict] = []
+    if open_items:
+        warnings.append({
+            "kind": "items",
+            "label": "열린 할 일",
+            "text": f"아직 완료되지 않은 할 일이 {open_items}개 있습니다.",
+        })
+
+    external_rows = db.execute(
+        """
+        SELECT src_type, src_id, dst_type, dst_id, relation, reason
+        FROM item_links
+        WHERE relation IN ('blocks','depends_on')
+          AND (
+            (src_type='project' AND src_id=? AND dst_type NOT IN ('project','item'))
+            OR
+            (dst_type='project' AND dst_id=? AND src_type NOT IN ('project','item'))
+          )
+        ORDER BY created_at DESC, id DESC
+        LIMIT 6
+        """,
+        (project_id, project_id),
+    ).fetchall()
+    for row in external_rows:
+        other_type = row["dst_type"] if row["src_type"] == "project" else row["src_type"]
+        other_id = row["dst_id"] if row["src_type"] == "project" else row["src_id"]
+        relation_label = "막음" if row["relation"] == "blocks" else "의존"
+        warnings.append({
+            "kind": other_type,
+            "label": relation_label,
+            "text": _label_for(db, other_type, other_id),
+        })
+
+    gh_pr_open = 0
+    gh_blocker_open = 0
+    if project["github_repo"]:
+        gh_pr_open = db.execute(
+            "SELECT COUNT(*) FROM github_cache WHERE repo=? AND type='pr' AND state='open'",
+            (project["github_repo"],),
+        ).fetchone()[0]
+        gh_blocker_open = db.execute(
+            """
+            SELECT COUNT(*)
+            FROM github_cache
+            WHERE repo=? AND type='issue' AND state='open'
+              AND (
+                lower(coalesce(labels,'')) LIKE '%block%'
+                OR lower(coalesce(labels,'')) LIKE '%bug%'
+                OR lower(coalesce(labels,'')) LIKE '%critical%'
+                OR lower(coalesce(title,'')) LIKE '%block%'
+              )
+            """,
+            (project["github_repo"],),
+        ).fetchone()[0]
+        if gh_pr_open:
+            warnings.append({
+                "kind": "gh_pr",
+                "label": "열린 PR",
+                "text": f"GitHub에 열린 PR이 {gh_pr_open}개 있습니다.",
+            })
+        if gh_blocker_open:
+            warnings.append({
+                "kind": "gh_issue",
+                "label": "blocker/bug",
+                "text": f"blocker 또는 bug 이슈가 {gh_blocker_open}개 열려 있습니다.",
+            })
+
+    counts = {
+        "open_items": int(open_items or 0),
+        "external_risks": len(external_rows),
+        "open_prs": int(gh_pr_open or 0),
+        "blocker_issues": int(gh_blocker_open or 0),
+    }
+    return {
+        "has_risk": bool(warnings),
+        "warnings": warnings[:8],
+        "counts": counts,
+    }
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -295,6 +399,17 @@ async def update_project_status(
     )
 
 
+@router.get("/api/projects/{proj_id}/close-gate")
+async def project_close_gate(
+    proj_id: int,
+    db: sqlite3.Connection = Depends(get_db),
+):
+    row = db.execute("SELECT 1 FROM projects WHERE id=?", (proj_id,)).fetchone()
+    if not row:
+        return JSONResponse({"error": "Project not found"}, status_code=404)
+    return _project_close_gate(db, proj_id)
+
+
 @router.patch("/api/stages/{stage_id}/status", response_class=HTMLResponse)
 async def update_stage_status(
     stage_id: int,
@@ -327,8 +442,9 @@ async def project_detail(
     request: Request,
     db: sqlite3.Connection = Depends(get_db),
 ):
-    from ..integrations import sync_github
-    await sync_github()
+    from ..integrations import schedule_integration_sync, sync_github
+
+    schedule_integration_sync("github", sync_github())
     proj = db.execute(
         """
         SELECT p.id, p.title, p.status, p.start_date, p.end_date,
@@ -388,6 +504,8 @@ async def project_detail(
             ).fetchall()
         ]
 
+    close_gate = _project_close_gate(db, project_id)
+
     from datetime import date
     return templates.TemplateResponse(
         request,
@@ -403,6 +521,7 @@ async def project_detail(
             "status_labels": _STATUS_LABELS,
             "valid_statuses": sorted(_VALID_PROJ_STATUSES),
             "github_issues": github_issues,
+            "close_gate": close_gate,
         },
     )
 

@@ -117,6 +117,24 @@ def _secret_is_set(key: str) -> bool:
     return bool(val and val.strip())
 
 
+def _settings_org_rows(db: sqlite3.Connection) -> list[dict]:
+    rows = db.execute(
+        """SELECT o.id, o.name, o.color,
+                  COUNT(DISTINCT b.id) AS biz_count,
+                  COUNT(DISTINCT p.id) AS proj_count,
+                  op.purpose, op.operating_scope, op.stakeholders,
+                  op.role_title, op.role_responsibilities, op.decision_rights,
+                  op.role_kpis, op.ai_guidance, op.constraints
+           FROM organizations o
+           LEFT JOIN businesses b ON b.org_id = o.id
+           LEFT JOIN projects   p ON p.business_id = b.id
+           LEFT JOIN organization_profiles op ON op.org_id = o.id
+           GROUP BY o.id
+           ORDER BY o.name"""
+    ).fetchall()
+    return [dict(o) for o in rows]
+
+
 # ── Native folder picker (Windows tkinter) ────────────────────────────────────
 
 def _open_folder_dialog_sync(initial: str = "") -> str:
@@ -342,15 +360,7 @@ async def setup_complete(db: sqlite3.Connection = Depends(get_db)):
 @router.get("/settings", response_class=HTMLResponse)
 async def settings_get(request: Request, db: sqlite3.Connection = Depends(get_db)):
     notes_root = _get_setting(db, "mc_notes_root")
-    orgs = db.execute(
-        """SELECT o.id, o.name, o.color,
-                  COUNT(DISTINCT b.id) AS biz_count,
-                  COUNT(DISTINCT p.id) AS proj_count
-           FROM organizations o
-           LEFT JOIN businesses b ON b.org_id = o.id
-           LEFT JOIN projects   p ON p.business_id = b.id
-           GROUP BY o.id ORDER BY o.name"""
-    ).fetchall()
+    orgs = _settings_org_rows(db)
 
     # Businesses grouped by org (for folder settings)
     businesses = db.execute(
@@ -382,7 +392,8 @@ async def settings_get(request: Request, db: sqlite3.Connection = Depends(get_db
         "settings.html",
         {
             "notes_root":   notes_root,
-            "orgs":         [dict(o) for o in orgs],
+            "orgs":         orgs,
+            "show_org_profiles": True,
             "org_colors":   _ORG_COLORS,
             "businesses":   [dict(b) for b in businesses],
             "tags":         [dict(t) for t in tags],
@@ -430,11 +441,11 @@ async def settings_add_org(
         from ..integrations import ensure_org_folder
         ensure_org_folder(notes_root, name)
 
-    orgs = db.execute("SELECT id, name, color FROM organizations ORDER BY name").fetchall()
+    orgs = _settings_org_rows(db)
     return templates.TemplateResponse(
         request,
         "partials/org_list.html",
-        {"orgs": [dict(o) for o in orgs]},
+        {"orgs": orgs, "show_org_profiles": True},
     )
 
 
@@ -454,12 +465,62 @@ async def settings_delete_org(
             status_code=409,
         )
     db.execute("DELETE FROM organizations WHERE id=?", (org_id,))
-    orgs = db.execute("SELECT id, name, color FROM organizations ORDER BY name").fetchall()
+    orgs = _settings_org_rows(db)
     return templates.TemplateResponse(
         request,
         "partials/org_list.html",
-        {"orgs": [dict(o) for o in orgs]},
+        {"orgs": orgs, "show_org_profiles": True},
     )
+
+
+@router.patch("/settings/org/{org_id}/profile", response_class=HTMLResponse)
+async def settings_org_profile(
+    org_id: int,
+    purpose: Annotated[str, Form()] = "",
+    operating_scope: Annotated[str, Form()] = "",
+    stakeholders: Annotated[str, Form()] = "",
+    role_title: Annotated[str, Form()] = "",
+    role_responsibilities: Annotated[str, Form()] = "",
+    decision_rights: Annotated[str, Form()] = "",
+    role_kpis: Annotated[str, Form()] = "",
+    ai_guidance: Annotated[str, Form()] = "",
+    constraints: Annotated[str, Form()] = "",
+    db: sqlite3.Connection = Depends(get_db),
+):
+    if not db.execute("SELECT 1 FROM organizations WHERE id=?", (org_id,)).fetchone():
+        return HTMLResponse('<span style="color:oklch(60% 0.21 25)">소속을 찾을 수 없습니다</span>', status_code=404)
+    db.execute(
+        """INSERT INTO organization_profiles (
+             org_id, purpose, operating_scope, stakeholders,
+             role_title, role_responsibilities, decision_rights,
+             role_kpis, ai_guidance, constraints, updated_at
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(org_id) DO UPDATE SET
+             purpose=excluded.purpose,
+             operating_scope=excluded.operating_scope,
+             stakeholders=excluded.stakeholders,
+             role_title=excluded.role_title,
+             role_responsibilities=excluded.role_responsibilities,
+             decision_rights=excluded.decision_rights,
+             role_kpis=excluded.role_kpis,
+             ai_guidance=excluded.ai_guidance,
+             constraints=excluded.constraints,
+             updated_at=excluded.updated_at""",
+        (
+            org_id,
+            purpose.strip() or None,
+            operating_scope.strip() or None,
+            stakeholders.strip() or None,
+            role_title.strip() or None,
+            role_responsibilities.strip() or None,
+            decision_rights.strip() or None,
+            role_kpis.strip() or None,
+            ai_guidance.strip() or None,
+            constraints.strip() or None,
+            _now(),
+        ),
+    )
+    return HTMLResponse('<span style="color:var(--st-done); font-size:12px;">저장됨</span>')
 
 
 @router.patch("/settings/business/{biz_id}/folder", response_class=HTMLResponse)

@@ -1,27 +1,76 @@
 {#
-  Org list partial — used in setup wizard (step 2) and settings page.
-  Context: orgs (list of dicts with id, name, color)
+  Org list partial used in setup wizard and settings.
+  Context: orgs, show_org_profiles
 #}
 <div id="org-list">
   {% if orgs %}
     {% for org in orgs %}
-    <div style="display:flex; align-items:center; gap:10px; padding:10px 14px;
-                background:var(--surface); border:1px solid var(--border);
-                border-radius:10px; margin-bottom:6px;">
-      <span style="width:28px; height:28px; border-radius:8px; display:inline-flex;
-                   align-items:center; justify-content:center; font-weight:800;
-                   color:white; font-size:13px; flex-shrink:0;
-                   background:{{ org.color or 'var(--brand)' }};">
-        {{ org.name[0] }}
-      </span>
-      <span style="font-size:14px; font-weight:500; flex:1;">{{ org.name }}</span>
-      <button style="background:none; border:none; color:var(--muted); cursor:pointer;
-                     font-size:18px; padding:0 4px; line-height:1;"
-              hx-delete="/settings/org/{{ org.id }}"
-              hx-target="#org-list"
-              hx-swap="outerHTML"
-              hx-confirm="'{{ org.name }}' 소속을 삭제하시겠습니까?"
-              title="삭제">×</button>
+    <div style="background:var(--surface); border:1px solid var(--border);
+                border-radius:10px; margin-bottom:10px; overflow:hidden;">
+      <div style="display:flex; align-items:center; gap:10px; padding:10px 14px;">
+        <span style="width:28px; height:28px; border-radius:8px; display:inline-flex;
+                     align-items:center; justify-content:center; font-weight:800;
+                     color:white; font-size:13px; flex-shrink:0;
+                     background:{{ org.color or 'var(--brand)' }};">
+          {{ org.name[0] }}
+        </span>
+        <span style="font-size:14px; font-weight:500; flex:1;">{{ org.name }}</span>
+        {% if show_org_profiles %}
+        <span style="font-size:11px; color:var(--muted);">
+          {{ org.biz_count or 0 }}개 사업 · {{ org.proj_count or 0 }}개 프로젝트
+        </span>
+        {% endif %}
+        <button style="background:none; border:none; color:var(--muted); cursor:pointer;
+                       font-size:18px; padding:0 4px; line-height:1;"
+                hx-delete="/settings/org/{{ org.id }}"
+                hx-target="#org-list"
+                hx-swap="outerHTML"
+                hx-confirm="'{{ org.name }}' 소속을 삭제하시겠습니까?"
+                title="삭제">×</button>
+      </div>
+
+      {% if show_org_profiles %}
+      <form style="display:grid; grid-template-columns:1fr 1fr; gap:14px; padding:14px;
+                   border-top:1px solid var(--border); background:var(--bg);"
+            hx-patch="/settings/org/{{ org.id }}/profile"
+            hx-target="#org-profile-result-{{ org.id }}"
+            hx-swap="innerHTML">
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <div style="font-size:11px; font-weight:700; color:var(--muted); letter-spacing:.06em; text-transform:uppercase;">
+            소속 메타데이터
+          </div>
+          <textarea class="field-input" name="purpose" rows="2"
+                    placeholder="소속의 본질, 존재 이유, 주요 목표">{{ org.purpose or '' }}</textarea>
+          <textarea class="field-input" name="operating_scope" rows="3"
+                    placeholder="다루는 업무 범위, 사업/고객/제품 경계">{{ org.operating_scope or '' }}</textarea>
+          <textarea class="field-input" name="stakeholders" rows="2"
+                    placeholder="주요 이해관계자, 보고 대상, 협업 대상">{{ org.stakeholders or '' }}</textarea>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <div style="font-size:11px; font-weight:700; color:var(--muted); letter-spacing:.06em; text-transform:uppercase;">
+            역할 메타데이터
+          </div>
+          <input class="field-input" name="role_title"
+                 placeholder="내 역할: PM, 대표, 개발, 운영, 자문 등"
+                 value="{{ org.role_title or '' }}">
+          <textarea class="field-input" name="role_responsibilities" rows="2"
+                    placeholder="내가 책임지는 업무와 반복 행동">{{ org.role_responsibilities or '' }}</textarea>
+          <textarea class="field-input" name="decision_rights" rows="2"
+                    placeholder="내가 결정할 수 있는 것, 확인 받아야 하는 것">{{ org.decision_rights or '' }}</textarea>
+          <textarea class="field-input" name="role_kpis" rows="2"
+                    placeholder="기대 KPI, 성과 지표, 관리해야 할 숫자">{{ org.role_kpis or '' }}</textarea>
+          <textarea class="field-input" name="ai_guidance" rows="2"
+                    placeholder="AI가 판단할 때 우선해야 할 기준">{{ org.ai_guidance or '' }}</textarea>
+          <textarea class="field-input" name="constraints" rows="2"
+                    placeholder="주의사항, 금지선, 리스크 신호">{{ org.constraints or '' }}</textarea>
+          <div style="display:flex; justify-content:flex-end; align-items:center; gap:8px;">
+            <span id="org-profile-result-{{ org.id }}" style="font-size:12px; min-height:16px;"></span>
+            <button class="btn-save" type="submit">프로필 저장</button>
+          </div>
+        </div>
+      </form>
+      {% endif %}
     </div>
     {% endfor %}
   {% else %}

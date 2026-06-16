@@ -58,6 +58,7 @@ def _query_today_items(
     db: sqlite3.Connection,
     org_id: int | None = None,
     tag: str = "",
+    unassigned: bool = False,
 ) -> list[dict]:
     today_str = date.today().isoformat()
     params: list = [today_str]
@@ -82,11 +83,17 @@ def _query_today_items(
         )
         params.insert(0, tag)  # tag param comes before today_str — adjust below
 
+    unassigned_join = ""
+    unassigned_where = ""
+    if unassigned:
+        unassigned_join = "LEFT JOIN item_projects ip_unassigned ON ip_unassigned.item_id = i.id "
+        unassigned_where = "AND ip_unassigned.item_id IS NULL"
+
     # rebuild params in correct query order
     params = []
     if tag:
         params.append(tag)
-    params.append(today_str)
+    params.extend([today_str, today_str, today_str, today_str, today_str])
     if org_id is not None:
         params.append(org_id)
 
@@ -94,7 +101,7 @@ def _query_today_items(
         f"""
         SELECT
             i.id, i.type, i.title, i.body, i.status, i.source,
-            i.scheduled_at,
+            i.scheduled_at, i.due_at, i.start_date, i.due_date,
             s.start_at, s.end_at,
             GROUP_CONCAT(DISTINCT t.name)                AS tag_names,
             GROUP_CONCAT(DISTINCT l.name || '|' || l.color) AS label_info,
@@ -112,14 +119,20 @@ def _query_today_items(
         LEFT JOIN file_index     fi  ON fi.item_id = i.id
         {org_join}
         {tag_join}
+        {unassigned_join}
         WHERE i.location = 'hot'
           AND i.status NOT IN ('cancelled')
           AND (
               date(COALESCE(s.start_at, i.scheduled_at)) = ?
+              OR date(i.due_at) = ?
+              OR date(i.due_date) = ?
+              OR (date(i.start_date) <= ? AND (i.due_date IS NULL OR date(i.due_date) >= ?))
               OR (i.scheduled_at IS NULL AND s.start_at IS NULL
+                  AND i.start_date IS NULL AND i.due_date IS NULL
                   AND i.status NOT IN ('done'))
           )
           {org_where}
+          {unassigned_where}
         GROUP BY i.id
         ORDER BY COALESCE(s.start_at, i.scheduled_at) ASC NULLS LAST,
                  i.created_at ASC
@@ -132,8 +145,10 @@ def _query_today_items(
         d = dict(r)
         d["tags"] = [t for t in (d["tag_names"] or "").split(",") if t]
         d["labels"] = _parse_labels(d["label_info"])
-        d["section"] = _bucket(d["start_at"])
-        d["time_display"] = _fmt_time(d["start_at"])
+        effective_start = d.get("start_at") or d.get("scheduled_at") or d.get("due_at")
+        d["section"] = _bucket(effective_start)
+        d["time_display"] = _fmt_time(effective_start)
+        d["due_time_display"] = _fmt_time(d.get("due_at")) if d.get("due_at") else ""
         d["evolution_count"] = d["evolution_count"] or 0
         items.append(d)
     return items
@@ -213,13 +228,14 @@ def _build_context(item_id: int, db: sqlite3.Connection) -> dict[str, Any] | Non
     ]
     ctx["labels"] = [
         dict(r) for r in db.execute(
-            "SELECT l.name, l.color FROM labels l "
+            "SELECT l.id, l.name, l.color FROM labels l "
             "JOIN item_labels il ON il.label_id=l.id WHERE il.item_id=?",
             (item_id,),
         ).fetchall()
     ]
     ctx["project"] = db.execute(
         """SELECT p.id, p.title, p.status, p.start_date, p.end_date, p.github_repo,
+                  p.folder_path, b.folder_path AS business_folder_path,
                   b.name AS business_name, o.name AS org_name,
                   (SELECT COUNT(*) FROM item_projects ip2
                    JOIN items i2 ON i2.id=ip2.item_id
@@ -324,8 +340,9 @@ async def partial_flow(
     db: sqlite3.Connection = Depends(get_db),
     org_id: int | None = None,
     tag: str = "",
+    unassigned: int = 0,
 ):
-    items = _query_today_items(db, org_id=org_id, tag=tag)
+    items = _query_today_items(db, org_id=org_id, tag=tag, unassigned=bool(unassigned))
     sections: dict[str, list] = {k: [] for k in _SECTION_LABELS}
     for item in items:
         sections[item["section"]].append(item)

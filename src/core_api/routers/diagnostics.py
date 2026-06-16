@@ -41,7 +41,8 @@ def _secret_status(key: str) -> str:
 def _db_stats(db: sqlite3.Connection) -> dict:
     tables = ["items", "projects", "organizations", "businesses",
               "capture_inbox", "notification_events", "retry_queue",
-              "file_index", "github_cache", "gcal_cache"]
+              "file_index", "github_cache", "gcal_cache", "item_links",
+              "integration_state"]
     counts = {}
     for t in tables:
         try:
@@ -79,6 +80,13 @@ async def diagnostics(request: Request, db: sqlite3.Connection = Depends(get_db)
     gcal_last = db.execute(
         "SELECT MAX(fetched_at) FROM gcal_cache"
     ).fetchone()[0]
+    integration_state = {
+        r["provider"]: dict(r)
+        for r in db.execute(
+            """SELECT provider, status, last_success_at, last_error_at, last_error, last_run_at
+               FROM integration_state"""
+        ).fetchall()
+    }
 
     # Worker status from settings
     def setting(key: str, default: str = "—") -> str:
@@ -112,6 +120,7 @@ async def diagnostics(request: Request, db: sqlite3.Connection = Depends(get_db)
             "creds": creds,
             "gh_last": gh_last,
             "gcal_last": gcal_last,
+            "integration_state": integration_state,
             "worker_status": worker_status,
             "recent_errors": [dict(r) for r in recent_errors],
             "recent_notifs": [dict(r) for r in recent_notifs],

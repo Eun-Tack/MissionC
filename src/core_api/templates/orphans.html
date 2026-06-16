@@ -155,6 +155,9 @@
       <!-- Bulk action bar -->
       <div class="bulk-bar" id="bulk-bar">
         <span class="bulk-count" id="bulk-count">0개 선택</span>
+        <select id="bulk-business" onchange="loadBulkProjects()">
+          <option value="">사업 선택</option>
+        </select>
         <select id="bulk-project">
           <option value="">— 프로젝트 선택 —</option>
           {% for p in projects %}
@@ -241,6 +244,47 @@
 <script>
 const selected = new Set();
 
+async function fetchLinkBrowser(kind, params = {}) {
+  const qs = new URLSearchParams({ kind });
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') qs.set(key, value);
+  });
+  const res = await fetch('/api/link-browser?' + qs.toString());
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.results || [];
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+async function initBulkBrowser() {
+  const businesses = await fetchLinkBrowser('business');
+  const businessSelect = document.getElementById('bulk-business');
+  if (!businessSelect) return;
+  businessSelect.innerHTML = '<option value="">사업 선택</option>' + businesses.map(row => {
+    const org = row.org_name ? `${row.org_name} / ` : '';
+    return `<option value="${row.id}">${escapeHtml(org + row.name)}</option>`;
+  }).join('');
+}
+
+async function loadBulkProjects() {
+  const businessId = document.getElementById('bulk-business')?.value || '';
+  const projects = await fetchLinkBrowser('project', { business_id: businessId });
+  const projectSelect = document.getElementById('bulk-project');
+  if (!projectSelect) return;
+  projectSelect.innerHTML = '<option value="">프로젝트 선택</option>' + projects.map(row => {
+    const prefix = [row.org_name, row.biz_name].filter(Boolean).join(' / ');
+    return `<option value="${row.id}">${escapeHtml((prefix ? prefix + ' / ' : '') + row.title)}</option>`;
+  }).join('');
+}
+
 function toggleSel(id) {
   if (selected.has(id)) {
     selected.delete(id);
@@ -320,5 +364,7 @@ document.addEventListener('htmx:afterRequest', e => {
     }
   }
 });
+
+initBulkBrowser();
 </script>
 {% endblock %}

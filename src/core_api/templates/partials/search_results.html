@@ -1,29 +1,43 @@
-{% set _type_icon = {"task": "☐", "schedule": "📅", "memo": "📝", "project_ref": "📁"} %}
+{% set _type_icon = {"task": "□", "schedule": "◇", "memo": "○", "project_ref": "◆", "gh_issue": "#", "gh_pr": "PR", "gcal_event": "Cal", "drive_file": "File"} %}
 {% if results %}
 {% for r in results %}
 <div class="result-item"
-     onclick="window.location.href='/?focus={{ r.id }}'">
+     onclick="{% if r.url and r.url != '#' %}window.location.href='{{ r.url }}'{% elif r.file_path %}fetch('/api/folder-open?path=' + encodeURIComponent('{{ r.file_path }}')){% else %}window.location.href='/?focus={{ r.id }}'{% endif %}">
   <div class="result-header">
-    <span class="result-icon">{{ _type_icon.get(r.type, '•') }}</span>
+    <span class="result-icon">{{ "◆" if r.scope == "project" else _type_icon.get(r.type, "□") }}</span>
     <span class="result-title">{{ r.title }}</span>
-    <span class="result-status">{{ r.status_ko }}</span>
+    <span class="result-status">{{ r.status_ko if r.status_ko else r.status }}</span>
   </div>
-  {% if r.snippet and r.snippet != r.title %}
+  {% if r.project_title or r.parent_title %}
+  <div class="result-meta">
+    {% if r.project_title %}<span class="result-tag">{{ r.project_title }}</span>{% endif %}
+    {% if r.parent_title %}<span class="result-tag">상위 할 일 {{ r.parent_title }}</span>{% endif %}
+  </div>
+  {% endif %}
+  {% if r.child_summary %}
+  <div class="result-snippet">{{ r.child_summary }}</div>
+  {% elif r.snippet and r.snippet != r.title %}
   <div class="result-snippet">{{ r.snippet | safe }}</div>
   {% endif %}
-  {% if r.scheduled_at %}
-  <div class="result-time">📅 {{ r.scheduled_at[:10] }}</div>
+  {% if r.external_url %}
+  <div class="result-time">외부 링크 열기</div>
+  {% elif r.file_path %}
+  <div class="result-time">파일 위치 열기</div>
+  {% elif r.item_count is not none %}
+  <div class="result-time">연결 할 일 {{ r.item_count }}개</div>
+  {% elif r.scheduled_at %}
+  <div class="result-time">{{ r.scheduled_at[:16] }}</div>
   {% endif %}
 </div>
 {% endfor %}
 {% elif q %}
 <div class="empty-state">
-  <div class="empty-icon">🔍</div>
-  "{{ q }}"에 대한 결과가 없습니다
+  <div class="empty-icon">⌕</div>
+  "{{ q }}" 결과가 없습니다
 </div>
 {% else %}
 <div class="empty-state">
-  <div class="empty-icon">🔍</div>
-  검색어를 입력하세요
+  <div class="empty-icon">⌕</div>
+  검색어를 입력하세요. GitHub, 캘린더, Drive 범위를 선택하면 최근 외부 항목도 볼 수 있습니다
 </div>
 {% endif %}

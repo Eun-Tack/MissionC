@@ -35,7 +35,7 @@ _GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 _GOOGLE_USER_URL  = "https://www.googleapis.com/oauth2/v3/userinfo"
 
 _SCOPE      = "openid email profile"
-_GCAL_SCOPE = "https://www.googleapis.com/auth/calendar.readonly"
+_GCAL_SCOPE = "https://www.googleapis.com/auth/calendar.events"
 _KEYRING_USER = "iet03"
 _GCAL_SECRET_KEY = "MC_GCAL_TOKEN"
 _LEGACY_GCAL_SECRET_KEY = "MC_GOOGLE_OAUTH"
@@ -46,7 +46,7 @@ def _cfg() -> dict:
         "client_id":     os.environ.get("GOOGLE_CLIENT_ID", ""),
         "client_secret": os.environ.get("GOOGLE_CLIENT_SECRET", ""),
         "allowed_email": os.environ.get("ALLOWED_EMAIL", ""),
-        "app_url":       os.environ.get("APP_URL", "http://localhost:8000"),
+        "app_url":       os.environ.get("APP_URL", ""),
     }
 
 
@@ -55,7 +55,7 @@ def _gcal_cfg() -> dict:
     return {
         "client_id":     os.environ.get("MC_GOOGLE_CLIENT_ID") or os.environ.get("GOOGLE_CLIENT_ID", ""),
         "client_secret": os.environ.get("MC_GOOGLE_CLIENT_SECRET") or os.environ.get("GOOGLE_CLIENT_SECRET", ""),
-        "app_url":       os.environ.get("APP_URL", "http://localhost:8000"),
+        "app_url":       os.environ.get("APP_URL", ""),
     }
 
 
@@ -89,6 +89,37 @@ def has_gcal_token() -> bool:
     return bool(data.get("refresh_token") or data.get("access_token"))
 
 
+def _remember_oauth_state(kind: str, state: str) -> None:
+    try:
+        from ..db import get_connection
+        with get_connection() as db:
+            db.execute(
+                """INSERT INTO settings(key, value, updated_at)
+                   VALUES(?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+                   ON CONFLICT(key) DO UPDATE SET
+                     value=excluded.value,
+                     updated_at=excluded.updated_at""",
+                (f"oauth_state_{kind}", state),
+            )
+    except Exception:
+        pass
+
+
+def _consume_oauth_state(kind: str, state: str) -> bool:
+    session_state_ok = bool(state)
+    try:
+        from ..db import get_connection
+        with get_connection() as db:
+            row = db.execute(
+                "SELECT value FROM settings WHERE key=?",
+                (f"oauth_state_{kind}",),
+            ).fetchone()
+            db.execute("DELETE FROM settings WHERE key=?", (f"oauth_state_{kind}",))
+            return session_state_ok and bool(row and row["value"] == state)
+    except Exception:
+        return False
+
+
 def auth_enabled() -> bool:
     return bool(os.environ.get("GOOGLE_CLIENT_ID"))
 
@@ -118,8 +149,9 @@ async def login_google(request: Request):
 
     state = secrets.token_urlsafe(16)
     request.session["oauth_state"] = state
+    _remember_oauth_state("login", state)
 
-    callback_url = f"{cfg['app_url']}/auth/callback"
+    callback_url = f"{_callback_base(request, cfg['app_url'])}/auth/callback"
     url = (
         f"{_GOOGLE_AUTH_URL}"
         f"?client_id={cfg['client_id']}"
@@ -140,10 +172,11 @@ async def callback(request: Request, code: str = "", state: str = "", error: str
     if error:
         return HTMLResponse(_error_page(f"Google 인증 거절: {error}"), status_code=403)
 
-    if state != request.session.pop("oauth_state", None):
+    session_state = request.session.pop("oauth_state", None)
+    if state != session_state and not _consume_oauth_state("login", state):
         return HTMLResponse(_error_page("잘못된 state 값입니다. 다시 로그인해주세요."), status_code=400)
 
-    callback_url = f"{cfg['app_url']}/auth/callback"
+    callback_url = f"{_callback_base(request, cfg['app_url'])}/auth/callback"
 
     async with httpx.AsyncClient(timeout=10) as client:
         # 코드 → 토큰 교환
@@ -196,7 +229,7 @@ async def logout(request: Request):
 @router.get("/gcal/connect")
 async def gcal_connect(request: Request):
     """GCal OAuth 시작 — calendar.readonly 스코프."""
-    if has_gcal_token() and request.query_params.get("force") != "1":
+    if request.query_params.get("force") != "1" and has_gcal_token():
         return RedirectResponse("/settings?gcal=connected")
 
     cfg = _gcal_cfg()
@@ -205,6 +238,7 @@ async def gcal_connect(request: Request):
 
     state = secrets.token_urlsafe(16)
     request.session["gcal_state"] = state
+    _remember_oauth_state("gcal", state)
 
     callback_url = f"{_callback_base(request, cfg['app_url'])}/auth/gcal/callback"
     url = f"{_GOOGLE_AUTH_URL}?{urlencode({
@@ -228,7 +262,8 @@ async def gcal_callback(request: Request, code: str = "", state: str = "", error
     if error:
         return HTMLResponse(_error_page(f"GCal 연결 거절: {error}"), status_code=403)
 
-    if state != request.session.pop("gcal_state", None):
+    session_state = request.session.pop("gcal_state", None)
+    if state != session_state and not _consume_oauth_state("gcal", state):
         return HTMLResponse(_error_page("state 불일치. 다시 시도해주세요."), status_code=400)
 
     callback_url = f"{_callback_base(request, cfg['app_url'])}/auth/gcal/callback"

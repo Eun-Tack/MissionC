@@ -100,8 +100,26 @@
       <span id="search-spinner" class="htmx-indicator">검색 중…</span>
     </form>
 
+    <!-- External search shortcuts -->
+    <div class="filter-bar" style="margin-bottom:10px;">
+      <div class="filter-chips">
+        {% set external_scope_opts = [('all','전체'),('project','프로젝트'),('task','할 일'),('subtask','하위 작업'),('github','GitHub'),('calendar','캘린더'),('drive','Drive/파일'),('external','외부 전체')] %}
+        {% for val, label in external_scope_opts %}
+        <a href="?q={{ q }}&scope={{ val }}&type_filter={{ type_filter }}&status_filter={{ status_filter }}&project_id={{ project_id or '' }}&date_from={{ date_from }}&date_to={{ date_to }}"
+           class="filter-chip {% if scope == val %}active{% endif %}">{{ label }}</a>
+        {% endfor %}
+      </div>
+    </div>
+
     <!-- Filter bar -->
     <div class="filter-bar">
+      <div class="filter-chips">
+        {% set scope_opts = [('all','전체'),('project','프로젝트 레벨'),('task','할 일 레벨'),('subtask','하위작업 레벨')] %}
+        {% for val, label in scope_opts %}
+        <a href="?q={{ q }}&scope={{ val }}&type_filter={{ type_filter }}&status_filter={{ status_filter }}&project_id={{ project_id or '' }}&date_from={{ date_from }}&date_to={{ date_to }}"
+           class="filter-chip {% if scope == val %}active{% endif %}">{{ label }}</a>
+        {% endfor %}
+      </div>
       <div class="filter-chips">
         {% set type_opts = [('', '전체'), ('task', '태스크'), ('schedule', '일정'), ('memo', '메모')] %}
         {% for val, label in type_opts %}
@@ -147,6 +165,7 @@
     <input type="hidden" name="project_id" value="{{ project_id or '' }}" form="search-form">
     <input type="hidden" name="date_from" value="{{ date_from }}" form="search-form">
     <input type="hidden" name="date_to" value="{{ date_to }}" form="search-form">
+    <input type="hidden" name="scope" value="{{ scope }}" form="search-form">
 
     {% if count > 0 %}
     <div class="result-count">{{ count }}개 결과{% if q %} — "{{ q }}"{% endif %}</div>

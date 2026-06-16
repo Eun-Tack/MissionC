@@ -39,6 +39,61 @@ _VALID_RECURRENCE = {"DAILY", "WEEKDAYS", "WEEKLY", "MONTHLY"}
 _TITLE_MAX = 10000
 
 
+def _normalize_due_at(value: str | None) -> str | None:
+    if value is None:
+        return None
+    val = value.strip()
+    if not val:
+        return None
+    if "T" not in val and len(val) == 10:
+        return f"{val}T23:59:00Z"
+    if "T" in val and not val.endswith("Z"):
+        return val + ":00Z" if len(val) == 16 else val
+    return val
+
+
+def _normalize_datetime(value: str | None, *, default_time: str = "00:00:00Z") -> str | None:
+    if value is None:
+        return None
+    val = value.strip()
+    if not val:
+        return None
+    if "T" not in val and len(val) == 10:
+        return f"{val}T{default_time}"
+    if "T" in val and not val.endswith("Z"):
+        return val + ":00Z" if len(val) == 16 else val
+    return val
+
+
+def _sync_schedule_row(
+    db: sqlite3.Connection,
+    item_id: int,
+    item_type: str,
+    scheduled_at: str | None,
+    end_at: str | None = None,
+    *,
+    end_at_provided: bool = False,
+) -> None:
+    """Keep schedules.start_at/end_at aligned with item schedule fields."""
+    if not scheduled_at:
+        db.execute("DELETE FROM schedules WHERE item_id=?", (item_id,))
+        return
+    if item_type != "schedule":
+        return
+    existing = db.execute(
+        "SELECT id, end_at FROM schedules WHERE item_id=? ORDER BY start_at ASC LIMIT 1",
+        (item_id,),
+    ).fetchone()
+    if existing:
+        next_end = end_at if end_at_provided else existing["end_at"]
+        db.execute("UPDATE schedules SET start_at=?, end_at=? WHERE id=?", (scheduled_at, next_end, existing["id"]))
+    else:
+        db.execute(
+            "INSERT INTO schedules (item_id, start_at, end_at) VALUES (?, ?, ?)",
+            (item_id, scheduled_at, end_at if end_at_provided else None),
+        )
+
+
 def _check_title(title: str) -> str:
     """Validate and trim title — raises 422 if too long. (B-003)"""
     t = (title or "").strip()
@@ -47,6 +102,40 @@ def _check_title(title: str) -> str:
     if len(t) > _TITLE_MAX:
         raise HTTPException(422, f"Title too long (max {_TITLE_MAX} chars, got {len(t)})")
     return t
+
+
+def _schedule_item_gcal_sync(item_id: int) -> None:
+    try:
+        from ..integrations import _record_integration_state, schedule_integration_sync, sync_item_to_gcal
+
+        async def _run():
+            try:
+                await sync_item_to_gcal(item_id)
+            except Exception as e:
+                _record_integration_state("gcal", "error", error=f"item {item_id}: {e}")
+                raise
+
+        schedule_integration_sync(f"gcal:item:{item_id}", _run())
+    except Exception:
+        return
+
+
+def _new_item_snippet(item_id: int, title: str, status: str = "todo") -> str:
+    return f"""
+<div id="anytime-list" hx-swap-oob="afterbegin">
+  <div class="row" id="item-{item_id}"
+       hx-get="/partial/context/{item_id}"
+       hx-target="#context-panel"
+       hx-swap="innerHTML">
+    <span class="time">·</span>
+    <span class="dot-wrap"><span id="dot-{item_id}"><span class="mc-dot" data-status="{escape(status)}"></span></span></span>
+    <span class="icon">□</span>
+    <div class="body">
+      <div class="title">{escape(title)}</div>
+    </div>
+  </div>
+</div>
+"""
 
 
 def _next_recurrence_date(current: str | None, rule: str) -> str | None:
@@ -77,6 +166,59 @@ def _next_recurrence_date(current: str | None, rule: str) -> str | None:
     return None
 
 
+def _sync_parent_date_bounds(db: sqlite3.Connection, item_id: int) -> str:
+    """Expand a parent item date range when a child lies outside it."""
+    child = db.execute(
+        "SELECT parent_id, start_date, due_date, scheduled_at, due_at FROM items WHERE id=?",
+        (item_id,),
+    ).fetchone()
+    if not child or not child["parent_id"]:
+        return ""
+
+    parent_id = child["parent_id"]
+    bounds = db.execute(
+        """
+        SELECT
+          MIN(COALESCE(start_date, due_date, scheduled_at, due_at)) AS min_start,
+          MAX(COALESCE(due_at, due_date, start_date, scheduled_at)) AS max_end
+        FROM items
+        WHERE parent_id=? AND status != 'cancelled'
+        """,
+        (parent_id,),
+    ).fetchone()
+    if not bounds or (not bounds["min_start"] and not bounds["max_end"]):
+        return ""
+
+    parent = db.execute(
+        "SELECT start_date, due_date FROM items WHERE id=?",
+        (parent_id,),
+    ).fetchone()
+    if not parent:
+        return ""
+
+    min_start = bounds["min_start"][:10] if bounds["min_start"] else None
+    max_end = bounds["max_end"][:10] if bounds["max_end"] else None
+    next_start = parent["start_date"]
+    next_due = parent["due_date"]
+    changed = []
+
+    if min_start and (not next_start or min_start < next_start):
+        next_start = min_start
+        changed.append(f"시작 {min_start}")
+    if max_end and (not next_due or max_end > next_due):
+        next_due = max_end
+        changed.append(f"마감 {max_end}")
+
+    if not changed:
+        return ""
+
+    db.execute(
+        "UPDATE items SET start_date=?, due_date=?, updated_at=? WHERE id=?",
+        (next_start, next_due, _now_iso(), parent_id),
+    )
+    return "상위 할 일 일정 자동 조정: " + ", ".join(changed)
+
+
 # ── Items CRUD ────────────────────────────────────────────────────────────────
 
 @router.post("/api/items", response_class=HTMLResponse)
@@ -90,6 +232,7 @@ async def create_item(
     parent_id: Annotated[int | None, Form()] = None,
     start_date: Annotated[str | None, Form()] = None,
     due_date: Annotated[str | None, Form()] = None,
+    due_at: Annotated[str | None, Form()] = None,
     recurrence_rule: Annotated[str | None, Form()] = None,
     recurrence_parent_id: Annotated[int | None, Form()] = None,
     db: sqlite3.Connection = Depends(get_db),
@@ -102,15 +245,50 @@ async def create_item(
         raise HTTPException(422, "Invalid recurrence_rule")
 
     title_clean = _check_title(title)
+    scheduled_at_norm = _normalize_datetime(scheduled_at)
+    end_at_norm = _normalize_datetime(end_at)
+    due_at_norm = _normalize_due_at(due_at)
+    duplicate = db.execute(
+        """SELECT i.id, i.status
+           FROM items i
+           LEFT JOIN schedules s ON s.item_id=i.id
+           WHERE i.status != 'cancelled'
+             AND i.type = ?
+             AND i.title = ?
+             AND COALESCE(i.parent_id, -1) = COALESCE(?, -1)
+             AND COALESCE(i.scheduled_at, '') = COALESCE(?, '')
+             AND COALESCE(i.due_at, '') = COALESCE(?, '')
+             AND COALESCE(i.start_date, '') = COALESCE(?, '')
+             AND COALESCE(i.due_date, '') = COALESCE(?, '')
+           ORDER BY i.id ASC
+           LIMIT 1""",
+        (type_, title_clean, parent_id, scheduled_at_norm, due_at_norm, start_date or None, due_date or None),
+    ).fetchone()
+    if duplicate:
+        if project_id:
+            db.execute(
+                "INSERT OR IGNORE INTO item_projects(item_id, project_id) VALUES(?,?)",
+                (duplicate["id"], project_id),
+            )
+        if scheduled_at_norm and (type_ == "schedule" or end_at_norm):
+            _sync_schedule_row(
+                db,
+                duplicate["id"],
+                type_,
+                scheduled_at_norm,
+                end_at_norm,
+                end_at_provided=end_at is not None,
+            )
+        return HTMLResponse(_new_item_snippet(duplicate["id"], title_clean, duplicate["status"]))
 
     now = _now_iso()
     cur = db.execute(
         """INSERT INTO items (type, title, body, body_inline, status, location,
-                              scheduled_at, parent_id, start_date, due_date,
+                              scheduled_at, due_at, parent_id, start_date, due_date,
                               recurrence_rule, recurrence_parent_id,
                               created_at, updated_at, source)
-           VALUES (?, ?, ?, 0, 'todo', 'hot', ?, ?, ?, ?, ?, ?, ?, ?, 'manual')""",
-        (type_, title_clean, body, scheduled_at, parent_id,
+           VALUES (?, ?, ?, 0, 'todo', 'hot', ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual')""",
+        (type_, title_clean, body, scheduled_at_norm, due_at_norm, parent_id,
          start_date or None, due_date or None,
          rule, recurrence_parent_id,
          now, now),
@@ -133,11 +311,14 @@ async def create_item(
         )
 
     # Create schedules row so end_at is available in calendar JOIN
-    if scheduled_at and (type_ == "schedule" or end_at):
+    if scheduled_at_norm and (type_ == "schedule" or end_at_norm):
         db.execute(
             "INSERT INTO schedules (item_id, start_at, end_at) VALUES (?, ?, ?)",
-            (item_id, scheduled_at, end_at or None),
+            (item_id, scheduled_at_norm, end_at_norm),
         )
+    if scheduled_at_norm or due_at_norm or start_date or due_date:
+        db.commit()
+        _schedule_item_gcal_sync(item_id)
 
     snippet = f"""
 <div id="anytime-list" hx-swap-oob="afterbegin">
@@ -154,7 +335,7 @@ async def create_item(
   </div>
 </div>
 """
-    return HTMLResponse(snippet)
+    return HTMLResponse(_new_item_snippet(item_id, title_clean))
 
 
 @router.patch("/api/items/{item_id}", response_class=HTMLResponse)
@@ -165,15 +346,21 @@ async def update_item(
     title: Annotated[str | None, Form()] = None,
     body: Annotated[str | None, Form()] = None,
     scheduled_at: Annotated[str | None, Form()] = None,
+    end_at: Annotated[str | None, Form()] = None,
     start_date: Annotated[str | None, Form()] = None,
     due_date: Annotated[str | None, Form()] = None,
+    due_at: Annotated[str | None, Form()] = None,
     recurrence_rule: Annotated[str | None, Form()] = None,
     db: sqlite3.Connection = Depends(get_db),
 ):
     """Inline edit — title/status/body/dates/recurrence (FR-CAP-01 AC-3)."""
     row = db.execute(
-        "SELECT id, status, title, type, scheduled_at, due_date, start_date, "
-        "recurrence_rule, body FROM items WHERE id = ?",
+        """SELECT i.id, i.status, i.title, i.type, i.scheduled_at, i.due_at,
+                  i.due_date, i.start_date, i.parent_id, i.recurrence_rule, i.body,
+                  s.end_at
+           FROM items i
+           LEFT JOIN schedules s ON s.item_id=i.id
+           WHERE i.id = ?""",
         (item_id,),
     ).fetchone()
     if not row:
@@ -195,12 +382,15 @@ async def update_item(
         updates.append("body = ?")
         params.append(body.strip() or None)
     if scheduled_at is not None:
-        val = scheduled_at.strip()
-        if val and "T" not in val and len(val) == 10:
-            val = f"{val}T00:00:00Z"
-        elif val and "T" in val and not val.endswith("Z"):
-            val = val + ":00Z" if len(val) == 16 else val
+        val = _normalize_datetime(scheduled_at)
         updates.append("scheduled_at = ?")
+        params.append(val or None)
+        row_d["scheduled_at"] = val
+    if end_at is not None:
+        row_d["end_at"] = _normalize_datetime(end_at)
+    if due_at is not None:
+        val = _normalize_due_at(due_at)
+        updates.append("due_at = ?")
         params.append(val or None)
     if start_date is not None:
         updates.append("start_date = ?")
@@ -220,6 +410,33 @@ async def update_item(
         updates.append("updated_at = ?")
         params.extend([_now_iso(), item_id])
         db.execute(f"UPDATE items SET {', '.join(updates)} WHERE id = ?", params)
+        if scheduled_at is not None or end_at is not None:
+            _sync_schedule_row(
+                db,
+                item_id,
+                row_d["type"],
+                row_d.get("scheduled_at"),
+                row_d.get("end_at"),
+                end_at_provided=end_at is not None,
+            )
+        parent_date_msg = _sync_parent_date_bounds(db, item_id)
+        if any(v is not None for v in (status, title, scheduled_at, end_at, start_date, due_date, due_at)):
+            db.commit()
+            _schedule_item_gcal_sync(item_id)
+    elif end_at is not None:
+        _sync_schedule_row(
+            db,
+            item_id,
+            row_d["type"],
+            row_d.get("scheduled_at"),
+            row_d.get("end_at"),
+            end_at_provided=True,
+        )
+        parent_date_msg = ""
+        db.commit()
+        _schedule_item_gcal_sync(item_id)
+    else:
+        parent_date_msg = ""
 
     new_status = status or row_d["status"]
     extra_oob = ""
@@ -290,7 +507,11 @@ async def update_item(
         dot_oob = f'<span id="dot-{item_id}" hx-swap-oob="true"><span class="mc-dot" data-status="{new_status}"></span></span>'
 
     status_marker = f'<span hidden data-status="{escape(new_status)}">{escape(new_status)}</span>'
-    return HTMLResponse(f"{dot_oob}\n{extra_oob}\n{status_marker}")
+    parent_msg_html = (
+        f'<span id="ctx-toast-{item_id}" hx-swap-oob="true" class="ctx-toast show">{escape(parent_date_msg)}</span>'
+        if parent_date_msg else ""
+    )
+    return HTMLResponse(f"{dot_oob}\n{extra_oob}\n{parent_msg_html}\n{status_marker}")
 
 
 # ── Project linking (FR-CAP-01 AC-5) ─────────────────────────────────────────
@@ -326,18 +547,103 @@ async def unlink_project(item_id: int, db: sqlite3.Connection = Depends(get_db))
 
 # ── Hierarchical sub-tasks (v1.6) ────────────────────────────────────────────
 
+def _render_subtasks(parent_id: int, db: sqlite3.Connection) -> HTMLResponse:
+    rows = db.execute(
+        """SELECT id, title, status, scheduled_at, due_at, due_date, start_date
+           FROM items
+           WHERE parent_id = ? AND status != 'cancelled'
+           ORDER BY status='done' ASC,
+                    COALESCE(due_at, due_date, '9999') ASC,
+                    created_at ASC""",
+        (parent_id,),
+    ).fetchall()
+
+    total = len(rows)
+    done = sum(1 for r in rows if r["status"] == "done")
+    pct = round(done * 100 / total) if total else 0
+    reload_attr = (
+        f"htmx.ajax('GET','/api/items/{parent_id}/subtasks',"
+        f"{{target:'#subtasks-{parent_id}',swap:'innerHTML'}})"
+    )
+    reload_html = escape(reload_attr, quote=True)
+
+    parts = [
+        f'<div data-pct="{pct}" data-total="{total}" data-done="{done}">',
+        '<div class="sub-progress-row">'
+        f'<span class="sub-progress-label">{done}/{total} 완료</span>'
+        f'<span class="sub-progress-pct">{pct}%</span>'
+        '</div>',
+        f'<div class="sub-progress-bar"><div class="sub-progress-fill" style="width:{pct}%"></div></div>',
+    ]
+    if rows:
+        parts.append('<div class="sub-list">')
+        for r in rows:
+            d = dict(r)
+            done_cls = " sub-done" if d["status"] == "done" else ""
+            next_status = "todo" if d["status"] == "done" else "done"
+            start_value = escape(d.get("start_date") or "", quote=True)
+            due_value = escape(d.get("due_date") or "", quote=True)
+            due_at_value = escape((d.get("due_at") or "")[:16], quote=True)
+            due = f' · 마감 {escape(d["due_date"])}' if d.get("due_date") else ""
+            due_time = f' {escape(d["due_at"][11:16])}' if d.get("due_at") else ""
+            is_overdue = (
+                d["status"] not in ("done", "cancelled")
+                and (
+                    (d.get("due_at") and d["due_at"][:10] < date.today().isoformat())
+                    or (d.get("due_date") and d["due_date"] < date.today().isoformat())
+                )
+            )
+            status_label = "지연" if is_overdue else {"todo": "대기", "doing": "진행", "waiting": "보류", "done": "완료"}.get(d["status"], d["status"])
+            parts.append(
+                f'<div class="sub-item sub-item-detail{done_cls}" id="sub-{d["id"]}">'
+                f'<button class="sub-check" hx-patch="/api/items/{d["id"]}" '
+                f'hx-vals=\'{{"status":"{next_status}"}}\' hx-swap="none" hx-on::after-request="{reload_html}">'
+                f'{"✓" if d["status"] == "done" else "○"}</button>'
+                '<div class="sub-main">'
+                f'<input class="sub-title-input" name="title" value="{escape(d["title"], quote=True)}" '
+                f'hx-patch="/api/items/{d["id"]}" hx-trigger="change" hx-include="this" hx-swap="none" hx-on::after-request="{reload_html}">'
+                '<div class="sub-controls">'
+                f'<select name="status" class="sub-status-select" hx-patch="/api/items/{d["id"]}" hx-trigger="change" hx-include="this" hx-swap="none" hx-on::after-request="{reload_html}">'
+                f'<option value="todo" {"selected" if d["status"] == "todo" else ""}>대기</option>'
+                f'<option value="doing" {"selected" if d["status"] == "doing" else ""}>진행</option>'
+                f'<option value="waiting" {"selected" if d["status"] == "waiting" else ""}>보류</option>'
+                f'<option value="done" {"selected" if d["status"] == "done" else ""}>완료</option>'
+                '<option value="cancelled">취소</option>'
+                '</select>'
+                f'<input type="date" name="start_date" value="{start_value}" title="시작" '
+                f'hx-patch="/api/items/{d["id"]}" hx-trigger="change" hx-include="this" hx-swap="none" hx-on::after-request="{reload_html}">'
+                f'<input type="date" name="due_date" value="{due_value}" title="마감일" '
+                f'hx-patch="/api/items/{d["id"]}" hx-trigger="change" hx-include="this" hx-swap="none" hx-on::after-request="{reload_html}">'
+                f'<input type="datetime-local" name="due_at" value="{due_at_value}" title="마감 시간" '
+                f'hx-patch="/api/items/{d["id"]}" hx-trigger="change" hx-include="this" hx-swap="none" hx-on::after-request="{reload_html}">'
+                '</div>'
+                f'<span class="sub-meta">{escape(status_label)}{due}{due_time}</span>'
+                '</div>'
+                f'<button class="sub-x" hx-delete="/api/items/{d["id"]}" hx-confirm="삭제?" '
+                f'hx-swap="none" hx-on::after-request="{reload_html}">×</button>'
+                '</div>'
+            )
+        parts.append('</div>')
+    else:
+        parts.append('<div style="font-size:12px; color:var(--muted); padding:8px 0;">하위 작업이 없습니다</div>')
+
+    parts.append('</div>')
+    return HTMLResponse("\n".join(parts))
+
+
 @router.get("/api/items/{parent_id}/subtasks", response_class=HTMLResponse)
 async def list_subtasks(
     parent_id: int,
     db: sqlite3.Connection = Depends(get_db),
 ):
     """Return HTML partial of sub-tasks for inline rendering in Context Panel."""
+    return _render_subtasks(parent_id, db)
     rows = db.execute(
-        """SELECT id, title, status, scheduled_at, due_date, start_date
+        """SELECT id, title, status, scheduled_at, due_at, due_date, start_date
            FROM items
            WHERE parent_id = ? AND status != 'cancelled'
            ORDER BY status='done' ASC,
-                    COALESCE(due_date, '9999') ASC,
+                    COALESCE(due_at, due_date, '9999') ASC,
                     created_at ASC""",
         (parent_id,),
     ).fetchall()
@@ -390,7 +696,11 @@ async def list_subtasks(
 async def create_subtask(
     parent_id: int,
     title: Annotated[str, Form()],
+    start_date: Annotated[str | None, Form()] = None,
     due_date: Annotated[str | None, Form()] = None,
+    due_at: Annotated[str | None, Form()] = None,
+    body: Annotated[str | None, Form()] = None,
+    assignee_name: Annotated[str | None, Form()] = None,
     db: sqlite3.Connection = Depends(get_db),
 ):
     """Create a child item under parent_id, inheriting parent's project."""
@@ -400,12 +710,27 @@ async def create_subtask(
 
     now = _now_iso()
     cur = db.execute(
-        """INSERT INTO items (type, title, body_inline, status, location,
-                              parent_id, due_date, created_at, updated_at, source)
-           VALUES ('task', ?, 0, 'todo', 'hot', ?, ?, ?, ?, 'manual')""",
-        (title_clean, parent_id, due_date or None, now, now),
+        """INSERT INTO items (type, title, body, body_inline, status, location,
+                              parent_id, start_date, due_date, due_at, created_at, updated_at, source)
+           VALUES ('task', ?, ?, 0, 'todo', 'hot', ?, ?, ?, ?, ?, ?, 'manual')""",
+        (title_clean, body or None, parent_id, start_date or None, due_date or None, _normalize_due_at(due_at), now, now),
     )
     new_id = cur.lastrowid
+
+    if assignee_name and assignee_name.strip():
+        assignee = assignee_name.strip()
+        existing = db.execute(
+            "SELECT id FROM contacts WHERE name=? COLLATE NOCASE LIMIT 1",
+            (assignee,),
+        ).fetchone()
+        contact_id = existing["id"] if existing else db.execute(
+            "INSERT INTO contacts(name) VALUES(?)",
+            (assignee,),
+        ).lastrowid
+        db.execute(
+            "INSERT OR IGNORE INTO item_contacts(item_id, contact_id, role) VALUES(?,?,?)",
+            (new_id, contact_id, "assignee"),
+        )
 
     # Inherit parent's project link
     parent_proj = db.execute(
@@ -417,6 +742,8 @@ async def create_subtask(
             "INSERT OR IGNORE INTO item_projects(item_id, project_id) VALUES(?,?)",
             (new_id, parent_proj[0]),
         )
+
+    _sync_parent_date_bounds(db, new_id)
 
     # Re-render the subtasks list
     return await list_subtasks(parent_id, db=db)
@@ -551,7 +878,40 @@ async def add_tag(
     db.execute("INSERT OR IGNORE INTO tags(name) VALUES (?)", (tag_name,))
     tag_id = db.execute("SELECT id FROM tags WHERE name=?", (tag_name,)).fetchone()["id"]
     db.execute("INSERT OR IGNORE INTO item_tags(item_id, tag_id) VALUES (?,?)", (item_id, tag_id))
-    return HTMLResponse(f'<span class="tag-chip">#{tag_name}</span>')
+    return HTMLResponse(
+        f'<span class="ctx-pill" id="tag-pill-{item_id}-{tag_id}">'
+        f'#{escape(tag_name)}'
+        f'<span class="x" hx-delete="/api/items/{item_id}/tags/{tag_id}" '
+        f'hx-target="#tag-pill-{item_id}-{tag_id}" hx-swap="outerHTML">×</span>'
+        f'</span>'
+    )
+
+
+@router.post("/api/items/{item_id}/tags/by-name", response_class=HTMLResponse)
+async def add_tag_by_name(
+    item_id: int,
+    tag_name: Annotated[str | None, Form()] = None,
+    name: Annotated[str | None, Form()] = None,
+    db: sqlite3.Connection = Depends(get_db),
+):
+    return await add_tag(item_id, tag_name or name or "", db)
+
+
+@router.delete("/api/items/{item_id}/tags/by-name", response_class=HTMLResponse)
+async def remove_tag_by_name(
+    item_id: int,
+    tag_name: Annotated[str | None, Form()] = None,
+    name: Annotated[str | None, Form()] = None,
+    db: sqlite3.Connection = Depends(get_db),
+):
+    clean = (tag_name or name or "").strip().lstrip("#")
+    if clean:
+        db.execute(
+            """DELETE FROM item_tags
+               WHERE item_id=? AND tag_id IN (SELECT id FROM tags WHERE name=?)""",
+            (item_id, clean),
+        )
+    return HTMLResponse("")
 
 
 @router.delete("/api/items/{item_id}/tags/{tag_id}", response_class=HTMLResponse)
@@ -582,8 +942,43 @@ async def add_label(
         return HTMLResponse("")
     color = label["color"] or "var(--surface-2)"
     return HTMLResponse(
-        f'<span class="label-chip" style="background:{color};">{label["name"]}</span>'
+        f'<span class="ctx-pill" data-type="{escape(label["name"])}" '
+        f'style="background:{escape(color)}; color:white;">'
+        f'{escape(label["name"])}'
+        f'<span class="x" hx-delete="/api/items/{item_id}/labels/{label_id}" '
+        f'hx-target="closest .ctx-pill" hx-swap="outerHTML">×</span>'
+        f'</span>'
     )
+
+
+@router.post("/api/items/{item_id}/labels/by-name", response_class=HTMLResponse)
+async def add_label_by_name(
+    item_id: int,
+    name: Annotated[str, Form()],
+    db: sqlite3.Connection = Depends(get_db),
+):
+    clean = name.strip()
+    if not clean:
+        raise HTTPException(422, "Empty label")
+    db.execute("INSERT OR IGNORE INTO labels(name, color, type) VALUES(?, '#f59e0b', 'custom')", (clean,))
+    label_id = db.execute("SELECT id FROM labels WHERE name=?", (clean,)).fetchone()["id"]
+    return await add_label(item_id, label_id, db)
+
+
+@router.delete("/api/items/{item_id}/labels/by-name", response_class=HTMLResponse)
+async def remove_label_by_name(
+    item_id: int,
+    name: Annotated[str, Form()],
+    db: sqlite3.Connection = Depends(get_db),
+):
+    clean = name.strip()
+    if clean:
+        db.execute(
+            """DELETE FROM item_labels
+               WHERE item_id=? AND label_id IN (SELECT id FROM labels WHERE name=?)""",
+            (item_id, clean),
+        )
+    return HTMLResponse("")
 
 
 @router.delete("/api/items/{item_id}/labels/{label_id}")
@@ -629,6 +1024,7 @@ async def export_all(db: sqlite3.Connection = Depends(get_db)):
         "labels":        q("SELECT * FROM labels"),
         "item_labels":   q("SELECT * FROM item_labels"),
         "organizations": q("SELECT * FROM organizations"),
+        "organization_profiles": q("SELECT * FROM organization_profiles"),
         "businesses":    q("SELECT * FROM businesses"),
         "projects":      q("SELECT * FROM projects"),
         "project_stages": q("SELECT * FROM project_stages"),

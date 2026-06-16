@@ -49,6 +49,18 @@
   .prog-fill     { height: 100%; background: var(--brand); border-radius: 999px;
                    transition: width 400ms var(--ease); }
 
+  .close-gate { background: var(--surface); border: 1px solid var(--border);
+                border-radius: 12px; padding: 14px 16px; margin-bottom: 24px; }
+  .close-gate.warn { border-color: oklch(70% 0.14 80); background: oklch(98% 0.02 80); }
+  .close-gate-head { display:flex; align-items:center; justify-content:space-between; gap:12px;
+                     font-size:13px; font-weight:700; margin-bottom:8px; }
+  .close-gate-copy { font-size:12px; color:var(--muted); line-height:1.5; }
+  .close-gate-list { display:grid; gap:6px; margin-top:10px; }
+  .close-gate-row { display:flex; align-items:center; gap:8px; font-size:12px; }
+  .close-gate-label { font-size:10px; font-weight:700; color:var(--brand);
+                      background:var(--brand-soft); border-radius:999px; padding:2px 7px; }
+  .close-gate-link { font-size:12px; color:var(--brand); text-decoration:none; }
+
   /* Items section */
   .items-section  { margin-bottom: 32px; }
   .items-group-h  { font-size: 11px; font-weight: 600; text-transform: uppercase;
@@ -60,6 +72,7 @@
   .item-dot       { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
                     cursor: pointer; border: none; padding: 0; }
   .item-dot[data-status="todo"]        { background: none; border: 2px solid var(--muted); }
+  .item-dot[data-status="doing"]       { background: var(--brand); }
   .item-dot[data-status="in_progress"] { background: var(--brand); }
   .item-dot[data-status="waiting"]     { background: var(--st-waiting); }
   .item-dot[data-status="done"]        { background: var(--st-done); }
@@ -228,6 +241,26 @@
     </div>
   </div>
 
+  <div class="close-gate {% if close_gate.has_risk %}warn{% endif %}">
+    <div class="close-gate-head">
+      <span>닫기 전 확인</span>
+      <a class="close-gate-link" href="/graph?project_id={{ proj.id }}">닫기 흐름 보기</a>
+    </div>
+    {% if close_gate.has_risk %}
+    <div class="close-gate-copy">완료로 바꾸기 전에 남은 일과 외부 신호를 확인하세요.</div>
+    <div class="close-gate-list">
+      {% for warning in close_gate.warnings %}
+      <div class="close-gate-row">
+        <span class="close-gate-label">{{ warning.label }}</span>
+        <span>{{ warning.text }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="close-gate-copy">열린 할 일이나 강한 외부 병목 신호가 없습니다.</div>
+    {% endif %}
+  </div>
+
   <!-- GitHub Issues (FR-GIT-04) -->
   {% if github_issues %}
   <div class="gh-section">
@@ -259,11 +292,12 @@
     <form id="proj-add-form"
           hx-post="/api/items"
           hx-swap="none"
-          hx-on::after-request="htmx.ajax('GET', '/partial/project/{{ proj.id }}/items', {target: '#proj-items', swap: 'innerHTML'}); document.getElementById('proj-add-form').reset();"
+          hx-on::after-request="projectAfterAdd(event, {{ proj.id }})"
           style="display:flex; gap:8px; align-items:center;">
       <input type="hidden" name="project_id" value="{{ proj.id }}">
+      <input type="hidden" name="type" value="task">
       <input class="h-input" type="text" name="title"
-             placeholder="새 할 일 추가..." style="flex:1;" autocomplete="off">
+             placeholder="새 할 일 추가..." style="flex:1;" autocomplete="off" required>
       <button type="submit" class="h-btn-primary">+ 추가</button>
     </form>
   </div>
@@ -278,6 +312,18 @@
 
 <script>
 async function updateProjStatus(projId, status) {
+  if (status === 'done') {
+    const gate = await fetch('/api/projects/' + projId + '/close-gate').then(r => r.json()).catch(() => null);
+    if (gate && gate.has_risk) {
+      const lines = gate.warnings.slice(0, 5).map(w => '- ' + w.label + ': ' + w.text).join('\n');
+      const ok = confirm('닫기 전 확인이 필요합니다.\n\n' + lines + '\n\n그래도 완료로 변경할까요?');
+      if (!ok) {
+        const select = document.getElementById('proj-status-' + projId);
+        if (select) select.value = '{{ proj.status }}';
+        return;
+      }
+    }
+  }
   const fd = new FormData();
   fd.append('status', status);
   await fetch('/api/projects/' + projId + '/status', {method: 'PATCH', body: fd});
@@ -300,6 +346,12 @@ function openProjCtx(itemId) {
   htmx.ajax('GET', '/partial/context/' + itemId, {target: '#proj-ctx-body', swap: 'innerHTML'});
   document.getElementById('proj-ctx-drawer').classList.add('open');
   document.getElementById('proj-ctx-overlay').classList.add('open');
+}
+
+function projectAfterAdd(event, projId) {
+  if (!event.detail.successful) return;
+  htmx.ajax('GET', '/partial/project/' + projId + '/items', {target: '#proj-items', swap: 'innerHTML'});
+  document.getElementById('proj-add-form').reset();
 }
 
 function closeProjCtx() {

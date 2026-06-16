@@ -1,97 +1,84 @@
 {% extends "base.html" %}
-{% block title %}대시보드 · MC{% endblock %}
+{% block title %}닫기 대시보드 · MissionC{% endblock %}
 
 {% block head %}
 <style>
   .page { display: grid; grid-template-rows: 56px 1fr; height: 100vh; }
   .content { padding: 28px 40px; overflow-y: auto; }
+  .page-head { display:flex; align-items:flex-end; justify-content:space-between; gap:20px; margin-bottom:22px; }
+  .page-title { font-size:22px; font-weight:800; letter-spacing:0; margin:0 0 4px; }
+  .page-sub { color:var(--muted); font-size:13px; margin:0; }
+  .head-actions { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+  .head-actions a { font-size:12px; color:var(--fg); text-decoration:none; padding:7px 10px; border:1px solid var(--border); border-radius:6px; background:var(--surface); }
+  .head-actions a:hover { border-color:var(--brand); color:var(--brand); }
 
-  /* KPI row */
-  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
-  .kpi-card {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 14px; padding: 20px 22px;
-  }
-  .kpi-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
-               color: var(--muted); font-weight: 600; margin-bottom: 8px; }
-  .kpi-value { font-size: 32px; font-weight: 800; letter-spacing: -0.03em;
-               line-height: 1; }
-  .kpi-sub   { font-size: 12px; color: var(--muted); margin-top: 6px; }
-  .kpi-card.highlight { border-color: var(--brand); background: var(--brand-soft); }
-  .kpi-card.highlight .kpi-value { color: var(--brand); }
-  .kpi-card.warn { border-color: oklch(75% 0.16 25); background: oklch(97% 0.02 25); }
-  .kpi-card.warn .kpi-value { color: oklch(55% 0.21 25); }
+  .kpi-row { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:14px; margin-bottom:26px; }
+  .kpi-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:18px 20px; min-width:0; }
+  .kpi-card.alert { border-color:oklch(75% 0.16 25); background:oklch(98% 0.018 25); }
+  .kpi-card.watch { border-color:oklch(78% 0.12 80); background:oklch(98% 0.018 80); }
+  .kpi-label { font-size:11px; color:var(--muted); font-weight:700; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:8px; }
+  .kpi-value { font-size:32px; line-height:1; font-weight:800; letter-spacing:0; }
+  .kpi-card.alert .kpi-value { color:oklch(55% 0.21 25); }
+  .kpi-card.watch .kpi-value { color:oklch(45% 0.16 80); }
+  .kpi-sub { color:var(--muted); font-size:12px; margin-top:7px; line-height:1.4; }
 
-  /* Section title */
-  .sec-title { font-size: 13px; font-weight: 700; text-transform: uppercase;
-               letter-spacing: 0.06em; color: var(--muted); margin-bottom: 16px; }
+  .section-title { font-size:13px; font-weight:800; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin:0 0 12px; }
+  .closure-list { display:grid; gap:8px; margin-bottom:26px; }
+  .closure-action { display:grid; grid-template-columns:1fr auto auto; gap:12px; align-items:center; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:12px 14px; }
+  .closure-name { font-weight:700; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .closure-meta { color:var(--muted); font-size:12px; margin-top:3px; }
+  .pill { display:inline-flex; align-items:center; justify-content:center; min-height:22px; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700; white-space:nowrap; background:var(--surface-2); color:var(--muted); }
+  .pill.danger { background:oklch(94% 0.06 25); color:oklch(42% 0.18 25); }
+  .pill.warn { background:oklch(96% 0.06 80); color:oklch(40% 0.16 80); }
+  .link-btn { color:var(--brand); text-decoration:none; font-size:12px; font-weight:700; white-space:nowrap; }
+  .item-close-list { display:grid; gap:8px; margin-bottom:26px; }
+  .item-close-row { display:grid; grid-template-columns:1fr auto auto; gap:12px; align-items:center; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:11px 14px; }
+  .item-close-title { font-weight:700; font-size:13px; }
+  .item-close-meta { color:var(--muted); font-size:12px; margin-top:3px; }
+  .mobile-review-row { display:grid; grid-template-columns:1fr auto auto; gap:8px; align-items:center; background:oklch(98% 0.018 240); border:1px solid oklch(86% 0.05 240); border-radius:8px; padding:11px 14px; }
+  .mini-btn { border:1px solid var(--border); background:var(--surface); color:var(--fg); border-radius:6px; padding:5px 9px; font-size:11px; font-weight:700; cursor:pointer; }
+  .mini-btn.primary { background:var(--brand); border-color:var(--brand); color:white; }
 
-  /* Weekly bar chart */
-  .week-chart {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 14px; padding: 20px 24px; margin-bottom: 28px;
-  }
-  .week-bars {
-    display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px;
-    align-items: end; height: 120px;
-  }
-  .week-bar-col { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-  .week-bar-wrap {
-    flex: 1; width: 100%; display: flex; flex-direction: column;
-    justify-content: flex-end; min-height: 8px;
-  }
-  .week-bar {
-    width: 100%; border-radius: 5px 5px 0 0; transition: height 400ms var(--ease);
-    position: relative; min-height: 4px;
-  }
-  .week-bar .bar-done {
-    background: var(--brand); border-radius: 5px 5px 0 0; width: 100%;
-    position: absolute; bottom: 0;
-  }
-  .week-bar .bar-todo {
-    background: var(--brand-soft); border-radius: 5px 5px 0 0; width: 100%;
-  }
-  .week-bar-label { font-size: 10px; color: var(--muted); font-weight: 600; }
-  .week-bar-date  { font-size: 9px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
-  .week-bar-pct   { font-size: 9px; color: var(--brand); font-weight: 700;
-                    font-family: 'JetBrains Mono', monospace; }
+  .proj-grid { background:var(--surface); border:1px solid var(--border); border-radius:8px; overflow:hidden; margin-bottom:26px; }
+  .proj-row { display:grid; grid-template-columns:minmax(160px, 1.4fr) 92px 70px 112px 104px minmax(150px, 1fr); gap:12px; align-items:center; padding:12px 16px; border-bottom:1px solid var(--border); }
+  .proj-row:last-child { border-bottom:0; }
+  .proj-row:hover { background:var(--surface-2); }
+  .proj-row-head { background:var(--surface-2); color:var(--muted); font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:0.06em; }
+  .proj-title { min-width:0; }
+  .proj-title a { color:var(--fg); text-decoration:none; font-size:13px; font-weight:700; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .proj-title a:hover { color:var(--brand); }
+  .proj-status { font-size:11px; color:var(--muted); font-weight:700; }
+  .proj-num { font-size:12px; font-family:'JetBrains Mono', monospace; color:var(--fg); }
+  .proj-risk { display:flex; gap:5px; flex-wrap:wrap; }
+  .proj-due { font-size:12px; color:var(--muted); font-family:'JetBrains Mono', monospace; }
+  .proj-action { color:var(--muted); font-size:12px; line-height:1.35; }
+  .progress { display:flex; align-items:center; gap:8px; }
+  .progress-track { height:6px; flex:1; background:var(--surface-2); border-radius:999px; overflow:hidden; }
+  .progress-fill { height:100%; background:linear-gradient(90deg, var(--brand), var(--accent)); border-radius:999px; }
+  .progress-pct { width:36px; text-align:right; color:var(--brand); font-size:11px; font-weight:800; font-family:'JetBrains Mono', monospace; }
 
-  /* Projects table */
-  .proj-grid {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 14px; overflow: hidden; margin-bottom: 28px;
-  }
-  .proj-row {
-    display: grid; grid-template-columns: 1fr 80px 120px 50px;
-    gap: 12px; align-items: center; padding: 12px 20px;
-    border-bottom: 1px solid var(--border);
-    transition: background 80ms;
-  }
-  .proj-row:last-child { border-bottom: 0; }
-  .proj-row:hover { background: var(--surface-2); }
-  .proj-row-head { background: var(--surface-2); font-size: 10px; font-weight: 600;
-                   text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
-  .proj-title { font-size: 13px; font-weight: 500; overflow: hidden;
-                text-overflow: ellipsis; white-space: nowrap; }
-  .proj-title a { color: var(--fg); text-decoration: none; }
-  .proj-title a:hover { color: var(--brand); }
-  .proj-status-badge {
-    font-size: 10px; padding: 2px 8px; border-radius: 999px; font-weight: 600;
-    text-align: center;
-  }
-  .proj-status-badge.active   { background: oklch(94% 0.06 240); color: oklch(35% 0.18 240); }
-  .proj-status-badge.planning { background: var(--brand-soft); color: var(--brand); }
-  .proj-status-badge.review   { background: oklch(96% 0.07 80); color: oklch(40% 0.16 80); }
-  .proj-status-badge.done     { background: oklch(94% 0.06 145); color: oklch(35% 0.16 145); }
-  .proj-status-badge.paused   { background: var(--surface-2); color: var(--muted); }
+  .week-chart { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:18px 20px; }
+  .week-bars { display:grid; grid-template-columns:repeat(7, 1fr); gap:8px; align-items:end; height:116px; }
+  .week-bar-col { display:flex; flex-direction:column; align-items:center; gap:4px; min-width:0; opacity:.72; }
+  .week-bar-col.today { opacity:1; }
+  .week-bar-wrap { width:100%; height:86px; display:flex; align-items:flex-end; }
+  .week-bar { width:100%; min-height:4px; border-radius:5px 5px 0 0; background:var(--brand-soft); position:relative; overflow:hidden; }
+  .bar-done { position:absolute; left:0; bottom:0; width:100%; background:var(--brand); border-radius:5px 5px 0 0; }
+  .week-bar-label { font-size:10px; color:var(--muted); font-weight:700; }
+  .week-bar-date { font-size:9px; color:var(--muted); font-family:'JetBrains Mono', monospace; }
+  .week-bar-pct { font-size:9px; color:var(--brand); font-weight:800; font-family:'JetBrains Mono', monospace; min-height:12px; }
 
-  /* Mini progress bar in project row */
-  .proj-bar-wrap { height: 6px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
-  .proj-bar-fill { height: 100%; border-radius: 999px;
-                   background: linear-gradient(90deg, var(--brand), var(--accent));
-                   transition: width 600ms var(--ease); }
-  .proj-pct { font-size: 11px; font-family: 'JetBrains Mono', monospace;
-              color: var(--brand); font-weight: 700; text-align: right; }
+  @media (max-width: 980px) {
+    .content { padding:20px; }
+    .page-head { align-items:flex-start; flex-direction:column; }
+    .head-actions { justify-content:flex-start; }
+    .kpi-row { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+    .proj-row { grid-template-columns:minmax(140px, 1fr) 78px 54px 90px; }
+    .proj-row > :nth-child(4),
+    .proj-row > :nth-child(6) { display:none; }
+    .closure-action { grid-template-columns:1fr auto; }
+    .closure-action .link-btn { grid-column:1 / -1; }
+  }
 </style>
 {% endblock %}
 
@@ -100,45 +87,157 @@
   {% set active_nav = 'dashboard' %}
   {% include "partials/topbar.html" %}
 
-  <div class="content">
-    <!-- KPI row -->
-    <div class="kpi-row" style="margin-bottom: 28px;">
-      <div class="kpi-card highlight">
-        <div class="kpi-label">오늘 완료</div>
-        <div class="kpi-value">{{ today_done }}</div>
-        <div class="kpi-sub">/ {{ today_total }}개 처리됨</div>
+  <main class="content">
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">닫기 대시보드</h1>
+        <p class="page-sub">오늘 닫아야 할 일, 지연된 일, 결정이 필요한 프로젝트를 모아봅니다.</p>
       </div>
-      <div class="kpi-card">
-        <div class="kpi-label">완료율 (오늘)</div>
-        <div class="kpi-value">{% if today_total %}{{ ((today_done / today_total) * 100) | round | int }}%{% else %}—{% endif %}</div>
-        <div class="kpi-sub">{{ today_done }} done / {{ today_total }} total</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">🔥 연속 달성</div>
-        <div class="kpi-value">{{ streak }}</div>
-        <div class="kpi-sub">일 연속 완료</div>
-      </div>
-      <div class="kpi-card {% if overdue_count > 0 %}warn{% endif %}">
-        <div class="kpi-label">기한 초과</div>
-        <div class="kpi-value">{{ overdue_count }}</div>
-        <div class="kpi-sub">{% if overdue_count > 0 %}<a href="/search?status_filter=todo&date_to={{ today }}" style="color:inherit;">확인하기 →</a>{% else %}없음{% endif %}</div>
+      <div class="head-actions">
+        <a href="/calendar">일정</a>
+        <a href="/wbs">WBS</a>
+        <a href="/search?status_filter=todo">열린 항목</a>
       </div>
     </div>
 
-    <!-- Weekly chart -->
+    <div class="kpi-row">
+      <div class="kpi-card">
+        <div class="kpi-label">열린 항목</div>
+        <div class="kpi-value">{{ open_count }}</div>
+        <div class="kpi-sub">예정, 진행, 대기 상태의 항목입니다.</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">오늘 마감</div>
+        <div class="kpi-value">{{ due_today_count }}</div>
+        <div class="kpi-sub">오늘 완료, 연기, 취소 중 하나로 정리해야 합니다.</div>
+      </div>
+      <div class="kpi-card {% if overdue_count > 0 %}alert{% endif %}">
+        <div class="kpi-label">지연</div>
+        <div class="kpi-value">{{ overdue_count }}</div>
+        <div class="kpi-sub">
+          {% if overdue_count > 0 %}
+            <a href="/search?status_filter=todo&date_to={{ today }}" style="color:inherit;">지연 항목 검토</a>
+          {% else %}
+            지연 항목이 없습니다.
+          {% endif %}
+        </div>
+      </div>
+      <div class="kpi-card {% if stale_count > 0 %}watch{% endif %}">
+        <div class="kpi-label">정체</div>
+        <div class="kpi-value">{{ stale_count }}</div>
+        <div class="kpi-sub">{{ stale_before }} 이후 갱신되지 않은 열린 항목입니다.</div>
+      </div>
+    </div>
+
+    {% if mobile_actions %}
+    <h2 class="section-title">모바일 변경 검토</h2>
+    <div class="item-close-list">
+      {% for a in mobile_actions %}
+      <div class="mobile-review-row" id="mobile-action-{{ a.id }}">
+        <div>
+          <div class="item-close-title">{{ a.title }}</div>
+          <div class="item-close-meta">
+            {{ a.item_title or 'MC 항목 연결 없음' }} · {{ a.old_value or '-' }} → {{ a.new_value or '-' }}
+          </div>
+        </div>
+        <button class="mini-btn primary"
+                hx-post="/api/mobile-sync-actions/{{ a.id }}/accept"
+                hx-target="#mobile-action-{{ a.id }}"
+                hx-swap="outerHTML">반영</button>
+        <button class="mini-btn"
+                hx-post="/api/mobile-sync-actions/{{ a.id }}/reject"
+                hx-target="#mobile-action-{{ a.id }}"
+                hx-swap="outerHTML">무시</button>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if closure_actions %}
+    <h2 class="section-title">결정이 필요한 프로젝트</h2>
+    <div class="closure-list">
+      {% for p in closure_actions %}
+      <div class="closure-action">
+        <div>
+          <div class="closure-name">{{ p.title }}</div>
+          <div class="closure-meta">{{ p.status_label }} · {{ p.action }}</div>
+        </div>
+        <span class="pill {% if p.overdue %}danger{% else %}warn{% endif %}">{{ p.risk }}</span>
+        <a class="link-btn" href="/project/{{ p.id }}">프로젝트 열기</a>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if closing_items %}
+    <h2 class="section-title">닫기 큐</h2>
+    <div class="item-close-list">
+      {% for item in closing_items %}
+      <div class="item-close-row">
+        <div>
+          <div class="item-close-title">{{ item.title }}</div>
+          <div class="item-close-meta">
+            {{ item.project_title or '소속 프로젝트 없음' }} ·
+            {% if item.due_at %}마감 {{ item.due_at[:16] | replace('T', ' ') }}
+            {% elif item.due_date %}마감 {{ item.due_date }}
+            {% else %}최근 갱신 {{ item.updated_at[:10] if item.updated_at else '-' }}
+            {% endif %}
+          </div>
+        </div>
+        <span class="pill {% if item.closure_reason == '지연' %}danger{% elif item.closure_reason == '오늘 마감' %}warn{% endif %}">{{ item.closure_reason }}</span>
+        {% if item.project_id %}
+        <a class="link-btn" href="/project/{{ item.project_id }}">프로젝트 열기</a>
+        {% else %}
+        <a class="link-btn" href="/?focus={{ item.id }}">오늘 화면에서 열기</a>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if projects %}
+    <h2 class="section-title">프로젝트 닫기 지도</h2>
+    <div class="proj-grid">
+      <div class="proj-row proj-row-head">
+        <div>프로젝트</div>
+        <div>상태</div>
+        <div>열림</div>
+        <div>위험</div>
+        <div>다음 마감</div>
+        <div>진척</div>
+      </div>
+      {% for p in projects %}
+      <div class="proj-row">
+        <div class="proj-title"><a href="/project/{{ p.id }}">{{ p.title }}</a></div>
+        <div class="proj-status">{{ p.status_label }}</div>
+        <div class="proj-num">{{ p.open }}</div>
+        <div class="proj-risk">
+          {% if p.overdue %}<span class="pill danger">지연 {{ p.overdue }}</span>{% endif %}
+          {% if p.stale %}<span class="pill warn">정체 {{ p.stale }}</span>{% endif %}
+          {% if not p.overdue and not p.stale %}<span class="pill">정상</span>{% endif %}
+        </div>
+        <div class="proj-due">{{ p.next_due or "-" }}</div>
+        <div class="progress" title="{{ p.done }} done / {{ p.total }} total">
+          <div class="progress-track"><div class="progress-fill" style="width:{{ p.pct }}%;"></div></div>
+          <div class="progress-pct">{{ p.pct }}%</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <h2 class="section-title">최근 완료 흐름</h2>
     <div class="week-chart">
-      <div class="sec-title">최근 7일 활동</div>
       {% set max_total = week_data | map(attribute='total') | max %}
       <div class="week-bars">
         {% for d in week_data %}
-        {% set bar_h = ((d.total / max_total) * 90) | int if max_total else 4 %}
-        {% set done_h = ((d.done / max_total) * 90) | int if max_total else 0 %}
-        <div class="week-bar-col">
-          {% if d.done > 0 %}<div class="week-bar-pct">{{ d.pct }}%</div>{% else %}<div class="week-bar-pct" style="opacity:0">0%</div>{% endif %}
+        {% set bar_h = ((d.total / max_total) * 86) | int if max_total else 4 %}
+        {% set done_h = ((d.done / max_total) * 86) | int if max_total else 0 %}
+        <div class="week-bar-col {% if loop.last %}today{% endif %}">
+          <div class="week-bar-pct">{% if d.done > 0 %}{{ d.pct }}%{% endif %}</div>
           <div class="week-bar-wrap">
-            <div class="week-bar" style="height: {{ bar_h }}px;">
-              <div class="bar-todo" style="height: {{ bar_h }}px;"></div>
-              <div class="bar-done" style="height: {{ done_h }}px;"></div>
+            <div class="week-bar" style="height:{{ bar_h }}px;">
+              <div class="bar-done" style="height:{{ done_h }}px;"></div>
             </div>
           </div>
           <div class="week-bar-label">{{ d.day }}</div>
@@ -147,44 +246,6 @@
         {% endfor %}
       </div>
     </div>
-
-    <!-- Projects progress -->
-    {% if projects %}
-    <div class="sec-title">프로젝트 현황</div>
-    <div class="proj-grid">
-      <div class="proj-row proj-row-head">
-        <div>프로젝트</div>
-        <div>상태</div>
-        <div>진행률</div>
-        <div>%</div>
-      </div>
-      {% for p in projects %}
-      <div class="proj-row">
-        <div class="proj-title">
-          <a href="/project/{{ p.id }}">{{ p.title }}</a>
-        </div>
-        <div>
-          <span class="proj-status-badge {{ p.status }}">
-            {{ {'active':'진행중','planning':'기획','review':'검토','done':'완료','paused':'중단'}.get(p.status, p.status) }}
-          </span>
-        </div>
-        <div>
-          <div class="proj-bar-wrap">
-            <div class="proj-bar-fill" style="width: {{ p.pct }}%"></div>
-          </div>
-        </div>
-        <div class="proj-pct">{{ p.pct }}%</div>
-      </div>
-      {% endfor %}
-    </div>
-    {% endif %}
-  </div>
+  </main>
 </div>
-
-<script>
-/* Make today's column stand out */
-document.querySelectorAll('.week-bar-col').forEach((col, i) => {
-  if (i === 6) col.style.opacity = '1'; else col.style.opacity = '0.65';
-});
-</script>
 {% endblock %}

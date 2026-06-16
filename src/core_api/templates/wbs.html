@@ -4,44 +4,60 @@
 {% block head %}
 <style>
   .page { display: grid; grid-template-rows: 56px 1fr; height: 100vh; }
-  .content { padding: 24px 32px; max-width: 1400px; margin: 0 auto; width: 100%;
-             overflow-y: auto; }
+  .content { padding: 24px 32px; max-width: 1400px; margin: 0 auto; width: 100%; overflow-y: auto; }
   .page-h-row { display: flex; align-items: baseline; gap: 14px; margin-bottom: 4px; }
-  .page-h     { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
-  .page-meta  { font-size: 12px; color: var(--muted); }
-  .page-sub   { font-size: 12px; color: var(--muted); margin-bottom: 18px; }
+  .page-h { font-size: 22px; font-weight: 800; letter-spacing: 0; }
+  .page-meta { font-size: 12px; color: var(--muted); }
+  .page-sub { font-size: 12px; color: var(--muted); margin-bottom: 18px; }
 
-  /* Selector controls */
   .wbs-selectors {
     display: flex; gap: 10px; margin-bottom: 24px; align-items: center;
     background: var(--surface); border: 1px solid var(--border);
     border-radius: 12px; padding: 12px 14px;
   }
-  .wbs-selectors label {
-    font-size: 11px; color: var(--muted); text-transform: uppercase;
-    letter-spacing: 0.06em; font-weight: 600;
-  }
+  .wbs-selectors label { font-size: 11px; color: var(--muted); font-weight: 700; }
   .wbs-selectors select {
     padding: 6px 12px; border: 1px solid var(--border); border-radius: 7px;
     background: var(--bg); color: var(--fg); font-size: 13px; font-family: inherit;
     min-width: 200px; cursor: pointer;
   }
   .wbs-selectors select:focus { outline: none; border-color: var(--brand); }
+  .wbs-range-inline { margin-left: auto; font-size: 11px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
 
-  /* Gantt frame */
+  .wbs-summary {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px; margin: -12px 0 16px;
+  }
+  .wbs-summary-item {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px 12px;
+  }
+  .wbs-summary-label { font-size: 10px; color: var(--muted); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+  .wbs-summary-value { margin-top: 5px; font-size: 13px; color: var(--fg); font-family: 'JetBrains Mono', monospace; }
+  .wbs-tools { display: flex; gap: 6px; align-items: center; justify-content: flex-end; }
+  .wbs-tool-btn {
+    min-width: 28px; height: 28px; border-radius: 7px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--fg); cursor: pointer; font-size: 13px;
+    font-family: inherit; padding: 0 8px;
+  }
+  .wbs-tool-btn:hover { border-color: var(--brand); color: var(--brand); background: var(--brand-soft); }
+  .wbs-zoom-readout { min-width: 52px; text-align: center; font-size: 11px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+
   .gantt {
     background: var(--surface); border: 1px solid var(--border);
     border-radius: 14px; overflow: hidden;
-    display: grid; grid-template-columns: 280px 1fr;
+    display: grid; grid-template-columns: 320px minmax(0, 1fr);
+    max-height: calc(100vh - 240px);
   }
-
-  /* Left column (item names) */
-  .gantt-names { border-right: 1px solid var(--border); }
+  .gantt-names { border-right: 1px solid var(--border); overflow: hidden; background: var(--surface); z-index: 3; }
   .gantt-name-h {
-    padding: 10px 14px; font-size: 11px; font-weight: 600; color: var(--muted);
-    text-transform: uppercase; letter-spacing: 0.06em;
+    height: 92px; padding: 18px 14px 10px; font-size: 11px; font-weight: 700; color: var(--muted);
     background: var(--surface-2); border-bottom: 1px solid var(--border);
-    position: sticky; top: 0; z-index: 2;
+    position: sticky; top: 0; z-index: 2; box-sizing: border-box;
+  }
+  .gantt-name-h .range-note {
+    display: block; margin-top: 8px; font-size: 11px; letter-spacing: 0;
+    color: var(--fg); font-family: 'JetBrains Mono', monospace;
   }
   .gantt-name {
     padding: 8px 14px; font-size: 13px; line-height: 1.3;
@@ -49,99 +65,105 @@
     display: flex; align-items: center; gap: 8px;
     height: 36px; box-sizing: border-box;
   }
+  .gantt-name.depth-0, .gantt-name.depth-1 { font-weight: 700; }
   .gantt-name.depth-2 { padding-left: 30px; font-size: 12px; color: var(--muted); }
-  .gantt-name .dot {
-    width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
-  }
-  .gantt-name .dot.todo        { background: none; border: 1.5px solid var(--muted); }
+  .gantt-name .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .gantt-name .dot.todo { background: none; border: 1.5px solid var(--muted); }
   .gantt-name .dot.in_progress,
   .gantt-name .dot.doing,
-  .gantt-name .dot.active      { background: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
-  .gantt-name .dot.done        { background: var(--st-done); }
+  .gantt-name .dot.active { background: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
+  .gantt-name .dot.done { background: var(--st-done); }
   .gantt-name .dot.waiting,
-  .gantt-name .dot.review      { background: var(--st-waiting); }
-  .gantt-name .dot.planning    { background: var(--accent); }
-  .gantt-name .dot.paused      { background: var(--muted); }
+  .gantt-name .dot.review { background: var(--st-waiting); }
+  .gantt-name .dot.planning { background: var(--accent); }
+  .gantt-name .dot.paused { background: var(--muted); }
   .gantt-name .label-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .gantt-name .pct {
     font-size: 10px; font-family: 'JetBrains Mono', monospace;
     color: var(--brand); font-weight: 600; flex-shrink: 0;
   }
 
-  /* Right column (timeline + bars) */
   .gantt-timeline {
-    position: relative; overflow-x: auto; overflow-y: hidden;
-    min-height: 100%;
+    position: relative; overflow: auto; min-height: 100%;
+    --wbs-day: 40px; cursor: grab; overscroll-behavior: contain;
   }
+  .gantt-timeline.dragging { cursor: grabbing; user-select: none; }
+  .gantt-canvas { position: relative; min-height: 100%; min-width: 100%; }
   .gantt-axis {
-    height: 36px; position: sticky; top: 0; z-index: 2;
+    height: 92px; position: sticky; top: 0; z-index: 2;
     background: var(--surface-2); border-bottom: 1px solid var(--border);
   }
-  .gantt-month-tick {
-    position: absolute; top: 0; bottom: 0; width: 1px; background: var(--border);
+  .gantt-month {
+    position: absolute; top: 0; height: 28px; border-right: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 800; color: var(--fg);
+    font-family: 'JetBrains Mono', monospace;
+    background: color-mix(in oklch, var(--surface-2) 78%, var(--bg));
   }
-  .gantt-month-label {
-    position: absolute; top: 9px; transform: translateX(4px);
+  .gantt-week {
+    position: absolute; top: 28px; height: 24px; border-right: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
     font-size: 10px; font-family: 'JetBrains Mono', monospace;
-    color: var(--muted); font-weight: 600;
+    color: var(--muted); font-weight: 700;
   }
-
-  /* Today line */
+  .gantt-day {
+    position: absolute; top: 52px; height: 40px; width: var(--wbs-day);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; color: var(--muted);
+  }
+  .gantt-day strong { font-size: 10px; line-height: 1; color: var(--fg); white-space: nowrap; }
+  .gantt-day span { font-size: 9px; line-height: 1.2; }
+  .gantt-day.is-dense span { display: none; }
+  .gantt-day.is-muted-label strong,
+  .gantt-day.is-muted-label span { visibility: hidden; }
+  .gantt-day.weekend { background: oklch(96% 0.008 270); }
+  .gantt-day.today { color: oklch(50% 0.21 25); font-weight: 800; background: color-mix(in oklch, var(--surface-2) 72%, oklch(93% 0.04 25)); }
+  .gantt-grid-line {
+    position: absolute; top: 92px; bottom: 0; width: 1px;
+    background: var(--border); opacity: 0.65; pointer-events: none;
+  }
+  .gantt-grid-line.weekend { background: oklch(90% 0.02 270); }
   .gantt-today-line {
-    position: absolute; top: 36px; bottom: 0;
-    width: 2px; background: oklch(60% 0.21 25); opacity: 0.7; z-index: 1;
-    pointer-events: none;
+    position: absolute; top: 92px; bottom: 0; width: 2px;
+    background: oklch(60% 0.21 25); opacity: 0.7; z-index: 1; pointer-events: none;
   }
   .gantt-today-label {
-    position: absolute; top: 14px; transform: translateX(-50%);
-    font-size: 10px; color: oklch(50% 0.21 25); font-weight: 700;
-    background: var(--surface-2); padding: 1px 6px; border-radius: 4px;
-    z-index: 2;
+    position: absolute; top: 62px; transform: translateX(-50%);
+    font-size: 10px; color: oklch(50% 0.21 25); font-weight: 800;
+    background: var(--surface-2); padding: 1px 6px; border-radius: 4px; z-index: 3;
   }
-
-  /* Bar rows */
-  .gantt-row {
-    height: 36px; box-sizing: border-box;
-    border-bottom: 1px solid var(--border);
-    position: relative;
-  }
+  .gantt-row { height: 36px; box-sizing: border-box; border-bottom: 1px solid var(--border); position: relative; }
   .gantt-bar {
-    position: absolute; top: 8px; height: 20px;
-    border-radius: 6px; display: flex; align-items: center;
-    padding: 0 8px; font-size: 11px; font-weight: 500;
-    overflow: hidden; white-space: nowrap;
+    position: absolute; top: 8px; height: 20px; border-radius: 6px;
+    display: flex; align-items: center; padding: 0 8px;
+    font-size: 11px; font-weight: 500; overflow: hidden; white-space: nowrap;
     cursor: pointer; transition: filter 120ms;
   }
   .gantt-bar:hover { filter: brightness(1.05); }
   .gantt-bar.kind-project { background: var(--brand); color: white; }
-  .gantt-bar.kind-task    { background: var(--brand-soft); color: var(--brand); border: 1px solid var(--brand); }
-  .gantt-bar.kind-subtask { background: oklch(95% 0.05 200); color: oklch(40% 0.16 200); border: 1px dashed oklch(70% 0.12 200); height: 16px; top: 10px; }
-  .gantt-bar.is-done { background: oklch(94% 0.06 145); color: oklch(35% 0.16 145); border: 1px solid oklch(75% 0.12 145); text-decoration: line-through; }
+  .gantt-bar.kind-task { background: var(--brand-soft); color: var(--brand); border: 1px solid var(--brand); }
+  .gantt-bar.kind-subtask {
+    background: oklch(95% 0.05 200); color: oklch(40% 0.16 200);
+    border: 1px dashed oklch(70% 0.12 200); height: 16px; top: 10px;
+  }
+  .gantt-bar.is-done {
+    background: oklch(94% 0.06 145); color: oklch(35% 0.16 145);
+    border: 1px solid oklch(75% 0.12 145); text-decoration: line-through;
+  }
   .gantt-bar.is-overdue { background: oklch(60% 0.21 25); color: white; border: none; }
-
-  /* Progress overlay on project bars */
   .gantt-bar-fill {
     position: absolute; left: 0; top: 0; bottom: 0;
-    background: oklch(0% 0 0 / 0.18); border-radius: 6px 0 0 6px;
-    pointer-events: none;
+    background: oklch(0% 0 0 / 0.18); border-radius: 6px 0 0 6px; pointer-events: none;
   }
-
-  /* No-date bar (just a dot at today) */
   .gantt-bar-undated {
     position: absolute; top: 13px; width: 10px; height: 10px;
     border-radius: 50%; background: var(--muted); opacity: 0.5;
   }
-
-  /* Empty state */
   .wbs-empty { text-align: center; padding: 80px 20px; color: var(--muted); }
-  .wbs-empty-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
+  .wbs-empty-icon { font-size: 40px; margin-bottom: 16px; opacity: 0.5; }
   .wbs-empty-title { font-size: 16px; font-weight: 600; color: var(--fg); margin-bottom: 8px; }
-
-  /* Legend */
-  .wbs-legend {
-    display: flex; gap: 16px; margin-top: 12px;
-    font-size: 11px; color: var(--muted); flex-wrap: wrap;
-  }
+  .wbs-legend { display: flex; gap: 16px; margin-top: 12px; font-size: 11px; color: var(--muted); flex-wrap: wrap; }
   .wbs-legend-item { display: flex; align-items: center; gap: 6px; }
   .wbs-legend-swatch { width: 18px; height: 8px; border-radius: 3px; }
 </style>
@@ -159,13 +181,12 @@
       <span class="page-meta">{{ header.org_name or '' }}{% if header.biz_name %} / {{ header.biz_name }}{% endif %} · {{ header.title }}</span>
       {% endif %}
     </div>
-    <div class="page-sub">사업 또는 프로젝트의 일정을 Gantt 뷰로 확인합니다.</div>
+    <div class="page-sub">프로젝트를 닫기 위해 작업 범위, 기간, 지연 위험을 시간 흐름으로 확인합니다.</div>
 
-    <!-- ── Selector ─────────────────────────────────────────── -->
     <div class="wbs-selectors">
       <label>사업</label>
       <select onchange="if(this.value) location.href='/wbs?biz_id='+this.value">
-        <option value="">— 사업 선택 —</option>
+        <option value="">사업 선택</option>
         {% for b in selectors.businesses %}
         <option value="{{ b.id }}" {% if biz_id == b.id %}selected{% endif %}>
           {% if b.org_name %}{{ b.org_name }} · {% endif %}{{ b.name }}
@@ -175,7 +196,7 @@
 
       <label>프로젝트</label>
       <select onchange="if(this.value) location.href='/wbs?proj_id='+this.value">
-        <option value="">— 프로젝트 선택 —</option>
+        <option value="">프로젝트 선택</option>
         {% for p in selectors.projects %}
         <option value="{{ p.id }}" {% if proj_id == p.id %}selected{% endif %}>
           {% if p.org_name %}{{ p.org_name }} / {% endif %}{% if p.biz_name %}{{ p.biz_name }} / {% endif %}{{ p.title }}
@@ -184,61 +205,98 @@
       </select>
 
       {% if scope != 'none' %}
-      <span style="margin-left:auto; font-size:11px; color:var(--muted); font-family:'JetBrains Mono',monospace;">
-        {{ range_start }} → {{ range_end }}
-      </span>
+      <span class="wbs-range-inline">{{ range_start }} → {{ range_end }}</span>
       {% endif %}
     </div>
 
-    <!-- ── Gantt body ───────────────────────────────────────── -->
     {% if rows %}
+    <div class="wbs-summary">
+      <div class="wbs-summary-item">
+        <div class="wbs-summary-label">범위</div>
+        <div class="wbs-summary-value">{{ range_start }} → {{ range_end }}</div>
+      </div>
+      <div class="wbs-summary-item">
+        <div class="wbs-summary-label">구성</div>
+        <div class="wbs-summary-value">{{ rows|selectattr('kind', 'equalto', 'project')|list|length }} 프로젝트 · {{ rows|selectattr('kind', 'equalto', 'task')|list|length }} 작업</div>
+      </div>
+      <div class="wbs-summary-item">
+        <div class="wbs-summary-label">기준</div>
+        <div class="wbs-summary-value">프로젝트 날짜 + 작업 날짜 추론</div>
+      </div>
+      <div class="wbs-summary-item">
+        <div class="wbs-summary-label">보기</div>
+        <div class="wbs-tools">
+          <button class="wbs-tool-btn" type="button" onclick="wbsZoomBy(0.85)" title="축소">-</button>
+          <span class="wbs-zoom-readout" id="wbs-zoom-readout">100%</span>
+          <button class="wbs-tool-btn" type="button" onclick="wbsZoomBy(1.18)" title="확대">+</button>
+          <button class="wbs-tool-btn" type="button" onclick="wbsCenterToday()" title="오늘로 이동">오늘</button>
+        </div>
+      </div>
+    </div>
+
     <div class="gantt">
-      <!-- Names column -->
       <div class="gantt-names">
-        <div class="gantt-name-h">항목</div>
+        <div class="gantt-name-h">
+          항목
+          <span class="range-note">{{ range_start }} → {{ range_end }}</span>
+        </div>
         {% for r in rows %}
         <div class="gantt-name depth-{{ r.depth }}">
           <span class="dot {{ r.status or 'todo' }}"></span>
           <span class="label-text" title="{{ r.title }}">{{ r.title }}</span>
-          {% if r.pct is defined %}<span class="pct">{{ r.pct }}%</span>{% endif %}
+          {% if r.pct is defined and r.pct is not none %}<span class="pct">{{ r.pct }}%</span>{% endif %}
         </div>
         {% endfor %}
       </div>
 
-      <!-- Timeline column -->
       <div class="gantt-timeline">
-        <div class="gantt-axis">
-          {% for m in markers %}
-          <div class="gantt-month-tick" style="left: {{ m.left }}%"></div>
-          <div class="gantt-month-label" style="left: {{ m.left }}%">{{ m.label }}</div>
+        <div class="gantt-canvas" data-days="{{ day_markers|length }}" style="width: {{ timeline_width }}px;">
+          <div class="gantt-axis">
+            {% for m in markers %}
+            <div class="gantt-month" data-left-day="{{ m.left_day }}" data-width-days="{{ m.width_days }}" style="left: {{ m.left_px }}px; width: {{ m.width_px }}px;">{{ m.label }}</div>
+            {% endfor %}
+            {% for w in week_markers %}
+            <div class="gantt-week" data-left-day="{{ w.left_day }}" data-width-days="{{ w.width_days }}" style="left: {{ w.left_px }}px; width: {{ w.width_px }}px;">{{ w.label }}</div>
+            {% endfor %}
+            {% for d in day_markers %}
+            <div class="gantt-day {% if d.is_weekend %}weekend{% endif %}{% if d.is_today %} today{% endif %}" data-left-day="{{ d.left_day }}" data-date="{{ d.date }}" style="left: {{ d.left_px }}px;" title="{{ d.date }}">
+              <strong>{{ d.label }}</strong><span>{{ d.weekday }}</span>
+            </div>
+            {% endfor %}
+          </div>
+
+          {% for d in day_markers %}
+          <div class="gantt-grid-line {% if d.is_weekend %}weekend{% endif %}" data-left-day="{{ d.left_day }}" style="left: {{ d.left_px }}px;"></div>
+          {% endfor %}
+
+          {% if today_offset_day is not none %}
+          <div class="gantt-today-line" id="wbs-today-line" data-left-day="{{ today_offset_day }}" data-day="{{ today_offset_day }}" style="left: {{ today_offset_px }}px"></div>
+          <div class="gantt-today-label" id="wbs-today-label" data-left-day="{{ today_offset_day }}" data-day="{{ today_offset_day }}" style="left: {{ today_offset_px }}px">오늘</div>
+          {% endif %}
+
+          {% for r in rows %}
+          <div class="gantt-row">
+            {% if r.has_dates %}
+            {% set is_overdue = r.bar_end and r.bar_end < today and r.status not in ('done', 'archived') %}
+            <div class="gantt-bar kind-{{ r.kind }}{% if r.status == 'done' %} is-done{% elif is_overdue %} is-overdue{% endif %}"
+                 data-left-day="{{ r.bar_left_day }}" data-width-days="{{ r.bar_width_days }}"
+                 style="left: {{ r.bar_left_px }}px; width: {{ r.bar_width_px }}px;"
+                 title="{{ r.title }} · {{ r.bar_start or '?' }} → {{ r.bar_end or '?' }}"
+                 {% if r.kind == 'project' %}onclick="location.href='/project/{{ r.id }}'"{% endif %}>
+              {% if r.kind == 'project' and r.pct is defined and r.pct is not none and r.pct > 0 %}
+              <div class="gantt-bar-fill" style="width: {{ r.pct }}%;"></div>
+              {% endif %}
+              <span style="position:relative; z-index:1;">{{ r.title[:24] }}{% if r.title|length > 24 %}...{% endif %}</span>
+            </div>
+            {% else %}
+            <div class="gantt-bar-undated"
+                 data-left-day="{{ today_offset_day if today_offset_day is not none else 8 }}"
+                 style="left: {{ today_offset_px if today_offset_px is not none else 320 }}px;"
+                 title="{{ r.title }} · 일정 미설정"></div>
+            {% endif %}
+          </div>
           {% endfor %}
         </div>
-
-        {% if today_offset is not none %}
-        <div class="gantt-today-line" style="left: {{ today_offset }}%"></div>
-        <div class="gantt-today-label" style="left: {{ today_offset }}%">오늘</div>
-        {% endif %}
-
-        {% for r in rows %}
-        <div class="gantt-row">
-          {% if r.has_dates %}
-          {% set is_overdue = r.bar_end and r.bar_end < today and r.status not in ('done', 'archived') %}
-          <div class="gantt-bar kind-{{ r.kind }}{% if r.status == 'done' %} is-done{% elif is_overdue %} is-overdue{% endif %}"
-               style="left: {{ r.bar_left }}%; width: {{ r.bar_width }}%;"
-               title="{{ r.title }} · {{ r.bar_start or '?' }} → {{ r.bar_end or '?' }}"
-               {% if r.kind == 'project' %}onclick="location.href='/project/{{ r.id }}'"{% endif %}>
-            {% if r.kind == 'project' and r.pct is defined and r.pct > 0 %}
-            <div class="gantt-bar-fill" style="width: {{ r.pct }}%;"></div>
-            {% endif %}
-            <span style="position:relative; z-index:1;">{{ r.title[:24] }}{% if r.title|length > 24 %}…{% endif %}</span>
-          </div>
-          {% else %}
-          <div class="gantt-bar-undated"
-               style="left: {{ today_offset or 50 }}%;"
-               title="{{ r.title }} · 일정 미설정"></div>
-          {% endif %}
-        </div>
-        {% endfor %}
       </div>
     </div>
 
@@ -252,11 +310,141 @@
 
     {% else %}
     <div class="wbs-empty">
-      <div class="wbs-empty-icon">📊</div>
+      <div class="wbs-empty-icon">WBS</div>
       <div class="wbs-empty-title">사업 또는 프로젝트를 선택하세요</div>
-      <div>위 셀렉터에서 항목을 선택하면 Gantt 형태로 일정이 표시됩니다.</div>
+      <div>선택한 영역의 작업 범위와 일정을 Gantt 형태로 표시합니다.</div>
     </div>
     {% endif %}
   </div>
 </div>
+
+<script>
+(function() {
+  const timeline = document.querySelector('.gantt-timeline');
+  const canvas = document.querySelector('.gantt-canvas');
+  const readout = document.getElementById('wbs-zoom-readout');
+  const todayLine = document.getElementById('wbs-today-line');
+  if (!timeline || !canvas) return;
+
+  const minPixelDay = 18;
+  const maxDay = 160;
+  const baseDay = 40;
+  const days = Math.max(1, Number(canvas.dataset.days || 1));
+  let dayWidth = baseDay;
+
+  function clamp(v, lo, hi) {
+    return Math.max(lo, Math.min(hi, v));
+  }
+
+  function labelStep() {
+    if (dayWidth >= 34) return 1;
+    if (dayWidth >= 24) return 2;
+    return 7;
+  }
+
+  function updateLabelDensity() {
+    const step = labelStep();
+    canvas.querySelectorAll('.gantt-day').forEach((el) => {
+      const leftDay = Number(el.dataset.leftDay || 0);
+      const date = el.dataset.date || '';
+      const isMonthStart = date.endsWith('-01');
+      const keep = leftDay === 0 || isMonthStart || el.classList.contains('today') || leftDay % step === 0;
+      el.classList.toggle('is-muted-label', !keep);
+      el.classList.toggle('is-dense', dayWidth < 34);
+    });
+  }
+
+  function positionItems() {
+    canvas.querySelectorAll('[data-left-day]').forEach((el) => {
+      const leftDay = Number(el.dataset.leftDay || 0);
+      el.style.left = (leftDay * dayWidth) + 'px';
+      if (el.dataset.widthDays) {
+        const widthDays = Math.max(1, Number(el.dataset.widthDays || 1));
+        el.style.width = (widthDays * dayWidth) + 'px';
+      }
+    });
+    updateLabelDensity();
+  }
+
+  function minDayForViewport() {
+    return Math.max(minPixelDay, timeline.clientWidth / days);
+  }
+
+  function applyZoom(nextScale, anchorClientX) {
+    const rect = timeline.getBoundingClientRect();
+    const anchorX = anchorClientX == null ? rect.left + rect.width * 0.22 : anchorClientX;
+    const localX = clamp(anchorX - rect.left, 0, rect.width);
+    const anchorDay = (timeline.scrollLeft + localX) / dayWidth;
+
+    dayWidth = Math.max(minDayForViewport(), clamp(baseDay * nextScale, minPixelDay, maxDay));
+    timeline.style.setProperty('--wbs-day', dayWidth + 'px');
+    canvas.style.width = Math.max(timeline.clientWidth, days * dayWidth) + 'px';
+    positionItems();
+    timeline.scrollLeft = Math.max(0, anchorDay * dayWidth - localX);
+
+    if (readout) readout.textContent = Math.round((dayWidth / baseDay) * 100) + '%';
+  }
+
+  window.wbsZoomBy = function(factor) {
+    const rect = timeline.getBoundingClientRect();
+    applyZoom((dayWidth / baseDay) * factor, rect.left + rect.width * 0.22);
+  };
+
+  window.wbsCenterToday = function() {
+    const todayDay = Number(todayLine?.dataset.day || 0);
+    timeline.scrollLeft = Math.max(0, todayDay * dayWidth - timeline.clientWidth * 0.22);
+  };
+
+  timeline.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    if (e.shiftKey) {
+      timeline.scrollLeft += e.deltaY || e.deltaX;
+      return;
+    }
+    applyZoom((dayWidth / baseDay) * (e.deltaY < 0 ? 1.12 : 0.9), e.clientX);
+  }, { passive: false });
+
+  let dragging = false;
+  let lastX = 0;
+  let moved = false;
+
+  timeline.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('.gantt-bar, button, a, select')) return;
+    dragging = true;
+    moved = false;
+    lastX = e.clientX;
+    timeline.classList.add('dragging');
+    timeline.setPointerCapture(e.pointerId);
+  });
+
+  timeline.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const dx = e.clientX - lastX;
+    if (Math.abs(dx) > 2) moved = true;
+    timeline.scrollLeft -= dx;
+    lastX = e.clientX;
+  });
+
+  function stopDrag(e) {
+    if (!dragging) return;
+    dragging = false;
+    timeline.classList.remove('dragging');
+    try { timeline.releasePointerCapture(e.pointerId); } catch (_) {}
+  }
+
+  timeline.addEventListener('pointerup', stopDrag);
+  timeline.addEventListener('pointercancel', stopDrag);
+  timeline.addEventListener('click', (e) => {
+    if (moved) {
+      e.preventDefault();
+      e.stopPropagation();
+      moved = false;
+    }
+  }, true);
+
+  window.addEventListener('resize', () => applyZoom(dayWidth / baseDay, null));
+  applyZoom(1, null);
+  requestAnimationFrame(() => window.wbsCenterToday());
+})();
+</script>
 {% endblock %}

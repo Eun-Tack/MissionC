@@ -81,6 +81,11 @@
     </div>
     <div class="sum-divider"></div>
     <div>
+      <div class="sum-num" style="color:var(--brand);">{{ in_progress|length }}</div>
+      <div class="sum-label">진행중</div>
+    </div>
+    <div class="sum-divider"></div>
+    <div>
       <div class="sum-num">{{ total }}</div>
       <div class="sum-label">전체</div>
     </div>
@@ -91,13 +96,30 @@
     {% endif %}
   </div>
 
-  {% if not incomplete %}
+  {% if in_progress %}
+  <div class="section-h">진행 중 항목 — 기간 안에 있는 일</div>
+  {% for item in in_progress %}
+  <div class="review-card">
+    <div class="review-title" style="margin-bottom:0;">
+      <span class="mc-dot" data-status="{{ item.status }}"></span>
+      {{ item.title }}
+      {% for tag in item.tags %}
+      <span class="tag-chip">#{{ tag }}</span>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  {% if not incomplete and not in_progress %}
   <div class="all-done">
     <div class="all-done-icon">✦</div>
     <div class="all-done-text">오늘 모든 항목 완료!</div>
     <div class="all-done-sub">수고하셨습니다</div>
   </div>
-  {% else %}
+  {% endif %}
+
+  {% if incomplete %}
   <div class="section-h">미완료 항목 — 사유 및 결정 (FR-DAY-04)</div>
 
   {% for item in incomplete %}

@@ -89,12 +89,45 @@ def _query_incomplete(db: sqlite3.Connection, today: str) -> list[dict]:
                ON ir.item_id = i.id AND ir.review_date = ?
         WHERE i.location = 'hot'
           AND i.status NOT IN ('done', 'cancelled')
+          AND i.status NOT IN ('doing', 'in_progress')
           AND (
               date(COALESCE(s.start_at, i.scheduled_at)) <= ?
-              OR (i.scheduled_at IS NULL AND s.start_at IS NULL)
+              OR date(i.due_date) <= ?
+              OR (i.scheduled_at IS NULL AND s.start_at IS NULL
+                  AND i.start_date IS NULL AND i.due_date IS NULL)
           )
+          AND NOT (date(i.start_date) <= ? AND (i.due_date IS NULL OR date(i.due_date) >= ?))
         GROUP BY i.id
         ORDER BY COALESCE(s.start_at, i.scheduled_at) ASC NULLS LAST
+        """,
+        (today, today, today, today, today),
+    ).fetchall()
+    result = []
+    for r in rows:
+        d = dict(r)
+        d["tags"] = [t for t in (d["tag_names"] or "").split(",") if t]
+        result.append(d)
+    return result
+
+
+def _query_in_progress(db: sqlite3.Connection, today: str) -> list[dict]:
+    rows = db.execute(
+        """
+        SELECT i.id, i.type, i.title, i.status,
+               s.start_at,
+               GROUP_CONCAT(DISTINCT t.name) AS tag_names
+        FROM items i
+        LEFT JOIN schedules s ON s.item_id = i.id
+        LEFT JOIN item_tags it ON it.item_id = i.id
+        LEFT JOIN tags t ON t.id = it.tag_id
+        WHERE i.location = 'hot'
+          AND i.status NOT IN ('done', 'cancelled')
+          AND (
+              i.status IN ('doing', 'in_progress')
+              OR (date(i.start_date) <= ? AND (i.due_date IS NULL OR date(i.due_date) >= ?))
+          )
+        GROUP BY i.id
+        ORDER BY COALESCE(i.due_date, s.start_at, i.scheduled_at, i.created_at) ASC
         """,
         (today, today),
     ).fetchall()
@@ -158,8 +191,9 @@ async def evening(request: Request, db: sqlite3.Connection = Depends(get_db)):
     date_ko, weekday_ko = _date_label(today)
 
     incomplete = _query_incomplete(db, today_str)
+    in_progress = _query_in_progress(db, today_str)
     done_count = _query_done_today(db, today_str)
-    total = done_count + len(incomplete)
+    total = done_count + len(in_progress) + len(incomplete)
 
     return templates.TemplateResponse(
         request,
@@ -169,6 +203,7 @@ async def evening(request: Request, db: sqlite3.Connection = Depends(get_db)):
             "weekday_korean": weekday_ko,
             "today_str": today_str,
             "incomplete": incomplete,
+            "in_progress": in_progress,
             "done_count": done_count,
             "total": total,
             "categories": _INCOMPLETE_CATEGORIES,

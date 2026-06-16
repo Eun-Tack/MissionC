@@ -106,12 +106,34 @@
         <div class="card-h">동기화 상태</div>
         <div class="stat-row">
           <span class="stat-key">GitHub 마지막 동기화</span>
-          <span class="stat-val">{{ (gh_last or '없음')[:16] | replace('T', ' ') }}</span>
+          {% set gh_state = integration_state.get('github', {}) %}
+          <span class="stat-val">{{ (gh_state.get('last_success_at') or gh_last or '없음')[:16] | replace('T', ' ') }}</span>
         </div>
         <div class="stat-row">
-          <span class="stat-key">GCal 마지막 동기화</span>
-          <span class="stat-val">{{ (gcal_last or '없음')[:16] | replace('T', ' ') }}</span>
+          <span class="stat-key">GitHub 상태</span>
+          <span class="pill {{ gh_state.get('status', 'notset') }}">{{ gh_state.get('status', 'unknown') }}</span>
         </div>
+        {% if gh_state.get('last_error') %}
+        <div class="stat-row">
+          <span class="stat-key">GitHub 오류</span>
+          <span class="stat-val" title="{{ gh_state.last_error }}">{{ gh_state.last_error[:32] }}</span>
+        </div>
+        {% endif %}
+        <div class="stat-row">
+          <span class="stat-key">GCal 마지막 동기화</span>
+          {% set gcal_state = integration_state.get('gcal', {}) %}
+          <span class="stat-val">{{ (gcal_state.get('last_success_at') or gcal_last or '없음')[:16] | replace('T', ' ') }}</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-key">GCal 상태</span>
+          <span class="pill {{ gcal_state.get('status', 'notset') }}">{{ gcal_state.get('status', 'unknown') }}</span>
+        </div>
+        {% if gcal_state.get('last_error') %}
+        <div class="stat-row">
+          <span class="stat-key">GCal 오류</span>
+          <span class="stat-val" title="{{ gcal_state.last_error }}">{{ gcal_state.last_error[:32] }}</span>
+        </div>
+        {% endif %}
       </div>
 
       <!-- Worker status -->

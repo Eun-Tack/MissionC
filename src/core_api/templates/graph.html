@@ -1,0 +1,289 @@
+{% extends "base.html" %}
+{% block title %}닫기 흐름 · MC{% endblock %}
+
+{% block head %}
+<style>
+  .page { min-height: 100vh; }
+  .flow-wrap { padding: 20px 24px 32px; display: grid; gap: 16px; }
+  .flow-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+  .flow-title { font-size: 24px; font-weight: 850; line-height: 1.2; }
+  .flow-sub { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .flow-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .flow-select, .flow-button, .flow-check { height: 36px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--fg); font-size: 13px; padding: 0 10px; }
+  .flow-select { min-width: 280px; }
+  .flow-button { background: var(--brand); color: white; border-color: var(--brand); font-weight: 700; cursor: pointer; }
+  .flow-check { display: inline-flex; align-items: center; gap: 6px; }
+
+  .empty { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 24px; color: var(--muted); }
+  .insights { display: grid; grid-template-columns: repeat(6, minmax(110px, 1fr)); gap: 10px; }
+  .metric { border: 1px solid var(--border); border-radius: 8px; background: var(--surface); padding: 12px; min-height: 74px; }
+  .metric-k { font-size: 12px; color: var(--muted); }
+  .metric-v { font-size: 24px; font-weight: 850; margin-top: 6px; }
+  .metric.overdue .metric-v { color: oklch(58% 0.2 25); }
+  .metric.stale .metric-v { color: oklch(55% 0.16 70); }
+  .metric.waiting .metric-v { color: oklch(55% 0.15 90); }
+  .metric.external .metric-v { color: oklch(50% 0.16 30); }
+  .hint { border: 1px solid var(--border); border-radius: 8px; background: var(--brand-soft); padding: 12px 14px; font-size: 13px; line-height: 1.5; }
+
+  .flow-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) 380px; gap: 16px; align-items: start; }
+  .panel { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); overflow: hidden; }
+  .panel-head { padding: 14px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .panel-title { font-weight: 800; }
+  .panel-note { color: var(--muted); font-size: 12px; }
+
+  .timeline { overflow-x: auto; }
+  .timeline-inner { min-width: 920px; position: relative; }
+  .time-head, .time-row { display: grid; grid-template-columns: 280px minmax(640px, 1fr); }
+  .time-head { position: sticky; top: 56px; z-index: 3; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .time-left { padding: 12px 14px; border-right: 1px solid var(--border); }
+  .days { display: grid; grid-template-columns: repeat({{ timeline_days|length if timeline_days else 1 }}, minmax(42px, 1fr)); min-height: 48px; }
+  .day { border-right: 1px solid var(--border); padding: 6px 5px; font-size: 11px; color: var(--muted); }
+  .day strong { display: block; color: var(--fg); font-size: 12px; }
+  .time-row { min-height: 52px; border-bottom: 1px solid var(--border); }
+  .item-cell { padding: 10px 14px; border-right: 1px solid var(--border); display: grid; gap: 4px; }
+  .item-title { font-weight: 700; font-size: 13px; line-height: 1.25; }
+  .item-title.sub { padding-left: 16px; color: var(--muted); }
+  .item-meta { display: flex; gap: 6px; flex-wrap: wrap; font-size: 11px; color: var(--muted); }
+  .pill { border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px; background: var(--bg); }
+  .bars { position: relative; background: linear-gradient(90deg, transparent calc(100% - 1px), var(--border) 0); background-size: calc(100% / {{ timeline_days|length if timeline_days else 1 }}) 100%; }
+  .today-line { position: absolute; top: 0; bottom: 0; width: 2px; background: oklch(58% 0.2 25); z-index: 2; }
+  .today-tag { position: absolute; top: 4px; transform: translateX(-50%); background: oklch(58% 0.2 25); color: white; font-size: 10px; font-weight: 800; border-radius: 999px; padding: 2px 6px; z-index: 4; }
+  .bar { position: absolute; top: 16px; height: 20px; border-radius: 5px; border: 1px solid; font-size: 11px; padding: 2px 7px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .bar.todo { background: oklch(94% 0.01 270); border-color: oklch(76% 0.02 270); color: var(--fg); }
+  .bar.doing { background: oklch(92% 0.05 240); border-color: oklch(62% 0.16 240); color: oklch(42% 0.16 240); }
+  .bar.waiting { background: oklch(94% 0.06 85); border-color: oklch(65% 0.15 85); color: oklch(42% 0.14 85); }
+  .bar.stale { background: oklch(94% 0.05 70); border-color: oklch(60% 0.16 70); color: oklch(42% 0.15 70); }
+  .bar.overdue { background: oklch(94% 0.05 25); border-color: oklch(58% 0.2 25); color: oklch(42% 0.18 25); }
+  .bar.done { background: oklch(93% 0.05 145); border-color: oklch(62% 0.16 145); color: oklch(38% 0.14 145); }
+
+  .side { display: grid; gap: 16px; }
+  .bottle-list { display: grid; gap: 8px; padding: 12px; }
+  .bottle { display: grid; gap: 5px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); text-decoration: none; color: var(--fg); }
+  .bottle:hover { border-color: var(--brand); }
+  .bottle-top { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; }
+  .bottle-reason { color: oklch(50% 0.18 25); font-weight: 800; }
+  .bottle-title { font-weight: 750; font-size: 13px; }
+  .bottle-meta { color: var(--muted); font-size: 11px; }
+  .decision-list { display: grid; gap: 8px; padding: 12px; }
+  .decision { display: grid; gap: 4px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); }
+  .decision strong { font-size: 13px; }
+  .decision span { color: var(--muted); font-size: 12px; line-height: 1.45; }
+
+  .flow-board { position: relative; height: 340px; background: var(--bg); }
+  .flow-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .flow-node { position: absolute; width: 148px; min-height: 48px; padding: 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); box-shadow: 0 8px 22px oklch(0% 0 0 / .05); }
+  .flow-node.external { border-color: oklch(58% 0.16 30); }
+  .flow-node.internal { border-color: var(--brand); }
+  .node-type { color: var(--muted); font-size: 10px; }
+  .node-label { font-size: 12px; font-weight: 750; line-height: 1.25; margin-top: 3px; }
+  .strategy { padding: 12px 14px; color: var(--muted); font-size: 12px; line-height: 1.55; border-top: 1px solid var(--border); }
+
+  @media (max-width: 1080px) {
+    .flow-grid { grid-template-columns: 1fr; }
+    .insights { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+    .flow-head { display: grid; }
+    .flow-controls { justify-content: stretch; }
+    .flow-select { min-width: 100%; }
+  }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="page">
+  {% set active_nav = 'graph' %}
+  {% include "partials/topbar.html" %}
+  <main class="flow-wrap">
+    <div class="flow-head">
+      <div>
+        <h1 class="flow-title">닫기 흐름</h1>
+        <p class="flow-sub">프로젝트를 끝내기 위해 남은 일, 시간 흐름, 병목, 외부 의존을 함께 봅니다.</p>
+      </div>
+      <form class="flow-controls" method="get" action="/graph">
+        <select class="flow-select" name="project_id" onchange="this.form.submit()">
+          {% for project in projects %}
+          <option value="{{ project.id }}" {% if selected_project and project.id == selected_project.id %}selected{% endif %}>
+            {{ project.title }} · 열린 항목 {{ project.open_count }} · 지연 {{ project.overdue_count }}
+          </option>
+          {% endfor %}
+        </select>
+        <label class="flow-check"><input type="checkbox" name="include_done" value="1" {% if include_done == '1' %}checked{% endif %}> 완료 포함</label>
+        <button class="flow-button" type="submit">보기</button>
+      </form>
+    </div>
+
+    {% if not selected_project %}
+    <div class="empty">표시할 프로젝트가 없습니다. 먼저 프로젝트와 할 일을 연결해주세요.</div>
+    {% else %}
+    <section class="insights" aria-label="closure insights">
+      <div class="metric"><div class="metric-k">열린 항목</div><div class="metric-v">{{ insights.open }}</div></div>
+      <div class="metric overdue"><div class="metric-k">지연</div><div class="metric-v">{{ insights.overdue }}</div></div>
+      <div class="metric stale"><div class="metric-k">정체</div><div class="metric-v">{{ insights.stale }}</div></div>
+      <div class="metric waiting"><div class="metric-k">대기</div><div class="metric-v">{{ insights.waiting }}</div></div>
+      <div class="metric external"><div class="metric-k">외부 의존</div><div class="metric-v">{{ insights.external_risk }}</div></div>
+      <div class="metric"><div class="metric-k">오늘 마감</div><div class="metric-v">{{ insights.today_due }}</div></div>
+    </section>
+    <div class="hint">{{ insights.hint }}</div>
+
+    <div class="flow-grid">
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <div class="panel-title">{{ selected_project.title }}</div>
+            <div class="panel-note">{{ insights.range_start }} → {{ insights.range_end }} · 최대 40개 항목 표시</div>
+          </div>
+          <a class="panel-note" href="/wbs?proj_id={{ selected_project.id }}">WBS로 보기</a>
+        </div>
+        <div class="timeline">
+          <div class="timeline-inner">
+            <div class="time-head">
+              <div class="time-left">항목</div>
+              <div class="days">
+                {% for day in timeline_days %}
+                <div class="day"><strong>{{ day.strftime('%m.%d') }}</strong>{{ day.strftime('%a') }}</div>
+                {% endfor %}
+              </div>
+            </div>
+            {% if items %}
+              {% for item in items %}
+              <div class="time-row">
+                <div class="item-cell">
+                  <a class="item-title {% if item.is_subtask %}sub{% endif %}" href="/?focus={{ item.id }}">{{ item.title }}</a>
+                  <div class="item-meta">
+                    <span class="pill">{{ item.status_label }}</span>
+                    <span class="pill">{{ item.state_label }}</span>
+                    <span class="pill">{{ item.progress }}%</span>
+                    {% if item.sub_total %}<span class="pill">하위 {{ item.sub_done }}/{{ item.sub_total }}</span>{% endif %}
+                  </div>
+                </div>
+                <div class="bars">
+                  <div class="bar {{ item.state }}" style="left: {{ item.left_pct }}%; width: max({{ item.width_pct }}%, 26px);" title="{{ item.start_label }} → {{ item.end_label }}">
+                    {{ item.title }}
+                  </div>
+                </div>
+              </div>
+              {% endfor %}
+            {% else %}
+              <div class="time-row">
+                <div class="item-cell"><div class="item-title">열린 항목 없음</div></div>
+                <div class="bars"></div>
+              </div>
+            {% endif %}
+            <div class="today-line" style="left: calc(280px + (100% - 280px) * {{ insights.today_left_pct }} / 100);"></div>
+            <div class="today-tag" style="left: calc(280px + (100% - 280px) * {{ insights.today_left_pct }} / 100);">오늘</div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="side">
+        <section class="panel">
+          <div class="panel-head">
+            <div class="panel-title">병목</div>
+            <div class="panel-note">닫기 전에 결정할 항목</div>
+          </div>
+          <div class="bottle-list">
+            {% if bottlenecks %}
+              {% for item in bottlenecks %}
+              <a class="bottle" href="/?focus={{ item.id }}">
+                <div class="bottle-top"><span class="bottle-reason">{{ item.state_label }}</span><span>{{ item.due_label }}</span></div>
+                <div class="bottle-title">{{ item.title }}</div>
+                <div class="bottle-meta">{{ item.start_label }} → {{ item.end_label }} · {{ item.status_label }}</div>
+              </a>
+              {% endfor %}
+            {% else %}
+              <div class="empty">지연/정체/대기 병목이 없습니다.</div>
+            {% endif %}
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div class="panel-title">다음 결정</div>
+            <div class="panel-note">보기보다 먼저 할 일</div>
+          </div>
+          <div class="decision-list">
+            {% for action in decision_actions %}
+            <div class="decision">
+              <strong>{{ action.label }}</strong>
+              <span>{{ action.text }}</span>
+            </div>
+            {% endfor %}
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div class="panel-title">외부 흐름</div>
+            <div class="panel-note">선택 프로젝트 밖 연결</div>
+          </div>
+          <div class="flow-board" id="closure-flow-board">
+            <svg class="flow-svg" id="closure-flow-svg"></svg>
+            {% for node in external_nodes %}
+            <div class="flow-node {% if node.external %}external{% else %}internal{% endif %}" data-node="{{ node.id }}">
+              <div class="node-type">{% if node.external %}외부{% else %}내부{% endif %} · {{ node.kind_label or node.type }}</div>
+              <div class="node-label">{{ node.label }}</div>
+            </div>
+            {% endfor %}
+            {% if not external_nodes %}
+            <div class="empty" style="margin: 12px;">외부 연결이 없습니다. 막힘/의존이 생길 때 항목 패널에서 연결을 추가하세요.</div>
+            {% endif %}
+          </div>
+          <div class="strategy">전체 연결망은 표시하지 않습니다. 선택 프로젝트 주변 연결만 최대 24개 노드, 40개 간선으로 제한해 닫기 판단에 필요한 흐름만 남깁니다.</div>
+        </section>
+      </aside>
+    </div>
+    {% endif %}
+  </main>
+</div>
+<script>
+const flowNodes = {{ external_nodes | tojson }};
+const flowEdges = {{ external_edges | tojson }};
+const flowBoard = document.getElementById('closure-flow-board');
+const flowSvg = document.getElementById('closure-flow-svg');
+
+function placeFlowNodes() {
+  if (!flowBoard) return;
+  const internal = flowNodes.filter(n => !n.external);
+  const external = flowNodes.filter(n => n.external);
+  const h = Math.max(flowBoard.clientHeight - 64, 200);
+  internal.forEach((n, i) => {
+    const el = flowBoard.querySelector(`[data-node="${CSS.escape(n.id)}"]`);
+    if (!el) return;
+    el.style.left = '24px';
+    el.style.top = `${28 + (i % 5) * Math.min(56, h / Math.max(internal.length, 1))}px`;
+  });
+  external.forEach((n, i) => {
+    const el = flowBoard.querySelector(`[data-node="${CSS.escape(n.id)}"]`);
+    if (!el) return;
+    el.style.right = '24px';
+    el.style.top = `${28 + (i % 5) * Math.min(56, h / Math.max(external.length, 1))}px`;
+  });
+}
+
+function nodeCenter(el) {
+  return { x: el.offsetLeft + el.offsetWidth / 2, y: el.offsetTop + el.offsetHeight / 2 };
+}
+
+function drawFlowEdges() {
+  if (!flowSvg || !flowBoard) return;
+  flowSvg.innerHTML = '';
+  flowEdges.forEach(edge => {
+    const a = flowBoard.querySelector(`[data-node="${CSS.escape(edge.source)}"]`);
+    const b = flowBoard.querySelector(`[data-node="${CSS.escape(edge.target)}"]`);
+    if (!a || !b) return;
+    const p1 = nodeCenter(a);
+    const p2 = nodeCenter(b);
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const mid = (p1.x + p2.x) / 2;
+    path.setAttribute('d', `M ${p1.x} ${p1.y} C ${mid} ${p1.y}, ${mid} ${p2.y}, ${p2.x} ${p2.y}`);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', 'oklch(68% 0.05 250)');
+    path.setAttribute('stroke-width', '1.5');
+    flowSvg.appendChild(path);
+  });
+}
+
+placeFlowNodes();
+drawFlowEdges();
+window.addEventListener('resize', () => { placeFlowNodes(); drawFlowEdges(); });
+</script>
+{% endblock %}

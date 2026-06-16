@@ -151,9 +151,19 @@
 
   <!-- SIDEBAR -->
   <div class="sidebar">
+    <div class="side-h">보기</div>
+    <div class="side-item active"
+         data-side-filter
+         hx-get="/partial/flow"
+         hx-target="#flow-content"
+         hx-swap="innerHTML">
+      오늘 <span class="meta">{{ total_items }}</span>
+    </div>
+
     <div class="side-h">소속</div>
     {% for org in organizations %}
-    <div class="side-item {% if loop.first %}active{% endif %}"
+    <div class="side-item"
+         data-side-filter
          style="cursor:pointer;"
          hx-get="/partial/flow?org_id={{ org.id }}"
          hx-target="#flow-content"
@@ -164,7 +174,8 @@
     <div class="side-item" style="color: var(--muted);">— 소속 없음</div>
     {% endfor %}
     <div class="side-item"
-         hx-get="/partial/flow"
+         data-side-filter
+         hx-get="/partial/flow?unassigned=1"
          hx-target="#flow-content"
          hx-swap="innerHTML">
       📁 무소속
@@ -173,6 +184,7 @@
     <div class="side-h">태그</div>
     {% for tag in tags %}
     <div class="side-item"
+         data-side-filter
          hx-get="/partial/flow?tag={{ tag.name }}"
          hx-target="#flow-content"
          hx-swap="innerHTML">
@@ -198,7 +210,7 @@
                      background:var(--brand-soft); color:var(--brand);
                      border:1px solid var(--brand); border-radius:7px;
                      cursor:pointer; font-family:inherit; font-weight:500;">
-        📅 새 일정
+        새 일정
       </button>
     </div>
 
@@ -244,7 +256,7 @@
               width:min(480px, 90vw); box-shadow:0 24px 64px oklch(0% 0 0 / 0.2);
               border:1px solid var(--border);">
     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
-      <span style="font-size:16px; font-weight:700;">새 일정 · 미팅 등록</span>
+      <span style="font-size:16px; font-weight:700;">새 일정 만들기</span>
       <button onclick="closeQuickSched()"
               style="background:none; border:none; color:var(--muted); font-size:18px; cursor:pointer;">✕</button>
     </div>
@@ -254,11 +266,11 @@
       <button class="qs-type-btn active" data-type="schedule" onclick="qsSetType('schedule',this)"
               style="flex:1; padding:7px; font-size:12px; border-radius:7px;
                      border:1px solid var(--brand); background:var(--brand-soft);
-                     color:var(--brand); cursor:pointer; font-family:inherit; font-weight:600;">★ 일정·미팅</button>
+                     color:var(--brand); cursor:pointer; font-family:inherit; font-weight:600;">일정/미팅</button>
       <button class="qs-type-btn" data-type="task" onclick="qsSetType('task',this)"
               style="flex:1; padding:7px; font-size:12px; border-radius:7px;
                      border:1px solid var(--border); background:var(--bg);
-                     color:var(--muted); cursor:pointer; font-family:inherit;">☐ 할 일</button>
+                     color:var(--muted); cursor:pointer; font-family:inherit;">할 일</button>
     </div>
 
     <!-- Title -->
@@ -319,11 +331,14 @@
 // ── Quick Schedule Modal ─────────────────────────────────────────
 let _qsType = 'schedule';
 
-function openQuickSched(dateStr) {
+function qsTodayISO() {
   const today = new Date();
-  const pad = n => String(n).padStart(2,'0');
-  document.getElementById('qs-date').value = dateStr ||
-    `${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`;
+  const pad = n => String(n).padStart(2, '0');
+  return `${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`;
+}
+
+function openQuickSched(dateStr) {
+  document.getElementById('qs-date').value = dateStr || qsTodayISO();
   document.getElementById('qs-time').value = '';
   document.getElementById('qs-title').value = '';
   document.getElementById('qs-project').value = '';
@@ -337,6 +352,7 @@ function openQuickSched(dateStr) {
     b.style.borderColor  = active ? 'var(--brand)'      : 'var(--border)';
     b.style.fontWeight   = active ? '600'               : 'normal';
   });
+  qsSyncTypeFields();
   const bd = document.getElementById('qs-backdrop');
   bd.style.display = 'flex';
   setTimeout(() => document.getElementById('qs-title').focus(), 60);
@@ -355,6 +371,22 @@ function qsSetType(type, btn) {
     b.style.borderColor = isActive ? 'var(--brand)'     : 'var(--border)';
     b.style.fontWeight = isActive ? '600' : 'normal';
   });
+  qsSyncTypeFields();
+}
+
+function qsSyncTypeFields() {
+  const title = document.getElementById('qs-title');
+  const time = document.getElementById('qs-time');
+  const project = document.getElementById('qs-project');
+  if (_qsType === 'task') {
+    title.placeholder = '할 일 제목...';
+    time.title = '시간을 넣으면 마감 시간으로 저장됩니다.';
+    project.options[0].textContent = '— 프로젝트 없이';
+  } else {
+    title.placeholder = '미팅 이름, 약속 내용...';
+    time.title = '비워두면 종일 일정으로 생성됩니다.';
+    project.options[0].textContent = '— 프로젝트 없이 (개인 일정·미팅)';
+  }
 }
 
 async function qsSubmit() {
@@ -366,22 +398,36 @@ async function qsSubmit() {
   const date = document.getElementById('qs-date').value;
   const time = document.getElementById('qs-time').value;
   const project_id = document.getElementById('qs-project').value;
-  const scheduled_at = date
-    ? (time ? `${date}T${time}:00Z` : `${date}T00:00:00Z`)
-    : '';
+  if (!date) {
+    document.getElementById('qs-error').textContent = '날짜를 선택하세요';
+    return;
+  }
   const btn = document.getElementById('qs-btn');
   btn.disabled = true; btn.textContent = '등록 중...';
   try {
     const fd = new FormData();
     fd.append('title', title);
     fd.append('type', _qsType);
-    if (scheduled_at) fd.append('scheduled_at', scheduled_at);
+    if (_qsType === 'schedule') {
+      fd.append('scheduled_at', time ? `${date}T${time}:00Z` : `${date}T00:00:00Z`);
+    } else {
+      fd.append('start_date', date);
+      fd.append('due_date', date);
+      if (time) fd.append('due_at', `${date}T${time}:00Z`);
+    }
     if (project_id)   fd.append('project_id', project_id);
     const res = await fetch('/api/items', {method:'POST', body:fd});
     if (!res.ok) throw new Error(await res.text());
+    const html = await res.text();
+    const itemId = html.match(/id="item-(\d+)"/)?.[1];
     closeQuickSched();
     // Refresh flow list
     htmx.ajax('GET', '/partial/flow', {target:'#flow-content', swap:'innerHTML'});
+    if (itemId) {
+      setTimeout(() => {
+        htmx.ajax('GET', `/partial/context/${itemId}`, {target:'#context-panel', swap:'innerHTML'});
+      }, 150);
+    }
   } catch(err) {
     document.getElementById('qs-error').textContent = '오류: ' + err.message;
   } finally {
@@ -393,6 +439,34 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && document.getElementById('qs-backdrop').style.display !== 'none') {
     closeQuickSched();
   }
+});
+
+document.addEventListener('click', async (e) => {
+  if (e.target.closest('[data-row-action]')) {
+    e.stopPropagation();
+    return;
+  }
+
+  const item = e.target.closest('[data-side-filter]');
+  const row = e.target.closest('.row[hx-get]');
+  if (!item && !row) return;
+
+  if (item) {
+    document.querySelectorAll('[data-side-filter].active').forEach(el => {
+      el.classList.remove('active');
+    });
+    item.classList.add('active');
+  }
+
+  if (window.htmx) return;
+
+  e.preventDefault();
+  const trigger = item || row;
+  const target = document.querySelector(trigger.getAttribute('hx-target'));
+  const url = trigger.getAttribute('hx-get');
+  if (!target || !url) return;
+  const res = await fetch(url);
+  target.innerHTML = await res.text();
 });
 </script>
 
@@ -496,9 +570,14 @@ captureInp.addEventListener('keydown', async (e) => {
     }
     const res = await fetch('/api/items', {method: 'POST', body: fd});
     const html = await res.text();
-    // Insert into anytime-list
+    // Insert only the returned row. The response may include an OOB wrapper.
     const list = document.getElementById('anytime-list');
-    if (list) list.insertAdjacentHTML('afterbegin', html);
+    const tpl = document.createElement('template');
+    tpl.innerHTML = html.trim();
+    const row = tpl.content.querySelector('.row');
+    if (list && row && !document.getElementById(row.id)) {
+      list.prepend(row);
+    }
     // Add tags after item creation (extract item_id from response)
     const newId = html.match(/id="item-(\d+)"/)?.[1];
     if (newId && p.tags.length) {
