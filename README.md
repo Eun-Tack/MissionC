@@ -62,10 +62,45 @@ MissionC currently includes:
 
 ## Run Locally
 
-Install dependencies first:
+### Fast start for Windows testers
+
+Clone the repository, then run:
+
+```cmd
+start-local.cmd
+```
+
+The script creates `.venv`, installs dependencies, copies `.env.example` to
+`.env` if needed, initializes the SQLite database, and starts the local server.
+
+Then open:
+
+```text
+http://127.0.0.1:8000
+```
+
+In local development mode, Google login is skipped unless `GOOGLE_CLIENT_ID` is
+configured in `.env`.
+
+### Manual setup
+
+Create and activate a virtual environment:
+
+```powershell
+py -3 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+Install dependencies:
 
 ```powershell
 pip install -r requirements.txt
+```
+
+Create local environment settings:
+
+```powershell
+Copy-Item .env.example .env
 ```
 
 Start the local app:
